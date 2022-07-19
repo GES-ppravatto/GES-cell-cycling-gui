@@ -36,9 +36,9 @@ with st.expander(
         files = st.file_uploader(
             "Select the cell-cycling datafiles", accept_multiple_files=True
         )
-        st.session_state["num_uploaded_files"] = len(files)
         submitted = st.form_submit_button("Load files")
         if submitted and files != []:
+            st.session_state["num_uploaded_files"] = len(files)
             extensions = [splitext(file.name)[1] for file in files]
             if extensions.count(extensions[0]) != len(extensions):
                 st.error(
@@ -113,15 +113,16 @@ if st.session_state["file_manager"] != None:
                     with ctime:
                         st.write(manager.halfcycles[entry].time.iloc[-1])
                     with corder:
-                        st.session_state["user_ordering_gui"][
-                            f"{level}:{n}"
-                        ] = st.number_input(
-                            "halfcycle ID:",
-                            min_value=0,
-                            value=level,
-                            step=1,
-                            key=level * st.session_state["number_of_halfcycles_files"]
-                            + n,
+                        st.session_state["user_ordering_gui"][f"{level}:{n}"] = int(
+                            st.number_input(
+                                "halfcycle ID:",
+                                min_value=0,
+                                value=level,
+                                step=1,
+                                key=level
+                                * st.session_state["number_of_halfcycles_files"]
+                                + n,
+                            )
                         )
 
         max_level = max(st.session_state["user_ordering_gui"].values())
@@ -199,7 +200,7 @@ if st.session_state["custom_ordering"] != []:
 
         with c4:
             st.metric(
-                "Partial-halfcycles joined",
+                "Halfcycles joined",
                 value=len(manager.halfcycles)
                 - len(st.session_state["custom_ordering"]),
             )
