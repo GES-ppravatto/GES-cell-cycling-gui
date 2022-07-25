@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from os.path import splitext
-from echemsuite.cellcycling.file_manager import FileManager, Instrument
+from echemsuite.cellcycling.read_input import FileManager, Instrument
 
 
 def set_default() -> None:

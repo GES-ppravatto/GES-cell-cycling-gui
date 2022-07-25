@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from typing import Tuple
-from echemsuite.cellcycling.read_input import Cycle, HalfCycle
+from echemsuite.cellcycling.cycles import Cycle, HalfCycle
 
 
 def halfcycle_property_from_key(halfcycle: HalfCycle, key: str) -> Tuple[pd.Series, str]:
