@@ -129,4 +129,5 @@ dmypy.json
 .pyre/
 
 # Local folders used for development
-/.vscode
+.vscode
+old
