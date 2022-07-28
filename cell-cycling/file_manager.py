@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 
 from core.gui_core import (
     ColorRGB,
@@ -95,7 +96,9 @@ with upload_tab:
 
             # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
             st.session_state["UploadConfirmation"][0] = new_experiment.name
-            if len(new_experiment.manager.bytestreams) != len(new_experiment.manager.halfcycles):
+            if len(new_experiment.manager.bytestreams) != len(
+                new_experiment.manager.halfcycles
+            ):
                 skipped_files = []
                 for filename in new_experiment.manager.bytestreams.keys():
                     if filename not in new_experiment.manager.halfcycles.keys():
@@ -104,7 +107,7 @@ with upload_tab:
 
             # Rerun the page to force update
             st.experimental_rerun()
-    
+
     created_experiment = st.session_state["UploadConfirmation"][0]
     skipped_files = st.session_state["UploadConfirmation"][1]
     if created_experiment is not None:
@@ -126,11 +129,11 @@ with manipulation_tab:
     status: ProgramStatus = st.session_state["ProgramStatus"]
 
     # Print a title and some info about the usage of the current tab
-    st.markdown("### Experiment manipulator:")
+    st.markdown("### Experiment editor:")
     st.write(
-        """In this tab you can manipulate the experiments loaded. Plese notice that to complete
-    the operation you must press the `Apply` button. Changing page or tab without doing so will result
-    in the lost of the loaded data."""
+        """In this tab you can edit or delete the experiments loaded. In absence of errors or warning requiring user
+        attention, edits done to the experiments are automatically saved. The edits are immediately applied to all the
+        app components."""
     )
 
     # Display a selectbox listing all the experiments available
@@ -140,7 +143,7 @@ with manipulation_tab:
         default_index = status.get_index_of(st.session_state["SelectedExperimentName"])
 
     name = st.selectbox(
-        "Select the experiment to manipulate", experiment_names, index=default_index
+        "Select the experiment to edit", experiment_names, index=default_index
     )
 
     # If the selection is valid open the manipulation tab
@@ -211,6 +214,15 @@ with manipulation_tab:
                         experiment.volume = volume
 
         with col2:
+            st.markdown("##### Clean non-physical cycles")
+
+            clean_status = st.checkbox(
+                " Allow only efficiencies <100% and complete charge/discharge cycles",
+                value=experiment.clean,
+            )
+            if clean_status != experiment.clean:
+                experiment.clean = clean_status
+
             st.markdown("##### Base color:")
             current_color = RGB_to_HEX(*experiment.color.get_RGB())
             color = st.color_picker(
@@ -397,4 +409,135 @@ with manipulation_tab:
 
 
 with inspector_tab:
-    pass
+
+    # Load a fresh ProgramStatus class from the session_state chache
+    status: ProgramStatus = st.session_state["ProgramStatus"]
+
+    # Print a title and some info about the usage of the current tab
+    st.markdown("### Experiment inspector:")
+    st.write("""In this tab you can inspect the experiments created,  """)
+
+    # Display a selectbox listing all the experiments available
+    experiment_names = status.get_experiment_names()
+    default_index = 0
+    if st.session_state["SelectedExperimentName"] is not None:
+        default_index = status.get_index_of(st.session_state["SelectedExperimentName"])
+
+    name = st.selectbox(
+        "Select the experiment to inspect", experiment_names, index=default_index
+    )
+
+    if name != None:
+
+        # Load the selected experiment in a fresh variable
+        experiment: Experiment = status[status.get_index_of(name)]
+
+        st.markdown("### General data:")
+        st.markdown("Instrument: ***{}***".format(experiment.manager.instrument))
+
+        # Get the cycle list from the current experiment and compute the number of hidden cycles
+        cycles = experiment.cycles
+        n_hidden = 0
+        for cycle in cycles:
+            if cycle._hidden:
+                n_hidden += 1
+
+        # Print report on the number of loaded/parsed/skipped files, and on the joined/hidden cycles
+        c1, c2, c3, c4, c5 = st.columns(5)
+        with c1:
+            st.metric("Uploaded files", value=len(experiment.manager.bytestreams))
+
+        with c2:
+            st.metric("Parsed files", value=len(experiment.manager.halfcycles))
+
+        with c3:
+            st.metric(
+                "Skipped files",
+                value=len(experiment.manager.bytestreams)
+                - len(experiment.manager.halfcycles),
+            )
+
+        with c4:
+            st.metric(
+                "Halfcycles joined",
+                value=len(experiment.manager.halfcycles) - len(experiment.ordering),
+            )
+
+        with c5:
+            st.metric("Hidden cycles", value=n_hidden)
+
+        # Generate a report on the loaded vs parsed/skipped files
+        with st.expander("Loaded file report:", expanded=True):
+
+            col1, col2, col3 = st.columns(3)
+
+            with st.container():
+                with col1:
+                    st.write("ID")
+                with col2:
+                    st.write("Filename")
+                with col3:
+                    st.write("Status:")
+
+            for idx, filename in enumerate(experiment.manager.bytestreams.keys()):
+
+                with st.container():
+                    with col1:
+                        st.write(idx)
+                    with col2:
+                        st.write(filename)
+                    with col3:
+                        if filename in experiment.manager.halfcycles.keys():
+                            st.write("🟢 PARSED")
+                        else:
+                            st.write("🔴 SKIPPED")
+
+        # Generate a non editable table with the final composition of each halfcycle
+        table = []
+        for level, level_list in enumerate(experiment.ordering):
+            for number, filename in enumerate(level_list):
+                table.append(
+                    [
+                        level,
+                        number,
+                        experiment.manager.halfcycles[filename].halfcycle_type,
+                        experiment.manager.halfcycles[filename].timestamp.strftime(
+                            "%d/%m/%Y    %H:%M:%S"
+                        ),
+                        filename,
+                    ]
+                )
+
+        df = pd.DataFrame(
+            table,
+            columns=["Halfcycle", "Partial halfcycle", "Type", "Timestamp", "Filename"],
+        )
+
+        # Print the halfcycle table in a dedicated expander
+        with st.expander("Halfcycles file ordering report:", expanded=True):
+            st.markdown("**Ordering report:**")
+            st.table(df)
+
+        # Generate a non-editable table reporting the composition of each cycle
+        table = []
+        for cycle in cycles:
+            charge_timestamp = (
+                cycle._charge._timestamp.strftime("%d/%m/%Y    %H:%M:%S")
+                if cycle._charge != None
+                else "None"
+            )
+            discharge_timestamp = (
+                cycle._discharge._timestamp.strftime("%d/%m/%Y    %H:%M:%S")
+                if cycle._discharge != None
+                else "None"
+            )
+            table.append([charge_timestamp, discharge_timestamp, cycle._hidden])
+
+        df = pd.DataFrame(
+            table, columns=["Charge timestamp", "Discharge timestamp", "Hidden"]
+        )
+
+        # Print the cycle table in a dedicated expander
+        with st.expander("Cycles report after parsing:", expanded=True):
+            st.markdown("**Cycles report:**")
+            st.table(df)

@@ -7,6 +7,7 @@ from palettable.cartocolors.cartocolorspalette import CartoColorsMap
 from colorsys import rgb_to_hsv, hsv_to_rgb
 
 from echemsuite.cellcycling.read_input import FileManager, Instrument
+from echemsuite.cellcycling.cycles import Cycle
 
 
 # %% Define functions to operate on colors
@@ -164,6 +165,9 @@ class Experiment:
         # Set the file ordering according to the one suggested by the FileManager
         self._ordering = self._manager.suggest_ordering()
 
+        # Set the clean flag of the file manager to false
+        self._clean = False
+
         # Get univocal ID based on the number of object constructed
         global _EXPERIMENT_INIT_COUNTER_
         self._id = _EXPERIMENT_INIT_COUNTER_
@@ -256,6 +260,21 @@ class Experiment:
                 raise RuntimeError
 
         self._ordering = new_ordering
+
+    @property
+    def clean(self):
+        return self._clean
+    
+    @clean.setter
+    def clean(self, value: bool):
+        if type(value) != bool:
+            raise TypeError
+        self._clean = value
+    
+    @property
+    def cycles(self) -> List[Cycle]:
+        self._manager.parse()
+        return self._manager.get_cycles(self._ordering, self._clean)
 
 
 # %% Define the ProgramStatus class to univocally identify the status of the GUI
