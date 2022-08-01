@@ -277,7 +277,7 @@ with manipulation_tab:
             # Print a button on the right to remove the selected files
             _, _, cright = st.columns(3)
             with cright:
-                remove = st.button("🗑️ Remove selected", key="lower")
+                remove |= st.button("🗑️ Remove selected", key="lower")
 
             # If the remove button in pressed remove the file from the experiment and rerun the page
             if remove:
