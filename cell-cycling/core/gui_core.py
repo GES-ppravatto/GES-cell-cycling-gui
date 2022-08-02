@@ -34,14 +34,18 @@ class ColorRGB:
         else:
             return r, g, b
 
-    def get_shade(self, index, levels):
+    def get_shade(self, index, levels, reversed=True):
 
         if index >= levels:
             raise ValueError
 
         r, g, b = self.saturate()
         h, _, s = rgb_to_hls(r / 255.0, g / 255.0, b / 255.0)
-        l = 0.9 - 0.6 * (index / (levels + 1))
+
+        if reversed:
+            l = 0.3 + 0.6 * (index / (levels + 1))
+        else:
+            l = 0.9 - 0.6 * (index / (levels + 1))
 
         r, g, b = [int(255 * c) for c in hls_to_rgb(h, l, s)]
         return r, g, b

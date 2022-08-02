@@ -133,7 +133,6 @@ if enable:
         st.markdown("### Experiment plots")
 
     view_settings: ExperimentSelector = st.session_state["CyclePlotSelection"]
-    st.write(view_settings)
 
     if not view_settings.is_empty:
 
@@ -175,6 +174,25 @@ if enable:
                         row=index + 1,
                         col=1,
                     )
+
+        fig.update_xaxes(
+            title_text="Time (s)",
+            showline=True,
+            linecolor="black",
+            gridwidth=1,
+            gridcolor="#DDDDDD",
+        )
+        fig.update_yaxes(
+            title_text="Voltage (V)",
+            secondary_y=False,
+            showline=True,
+            linecolor="black",
+            gridwidth=1,
+            gridcolor="#DDDDDD",
+        )
+        fig.update_layout(
+            plot_bgcolor="#FFFFFF",
+        )
 
         st.plotly_chart(fig, use_container_width=True)
 
