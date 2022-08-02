@@ -1,14 +1,13 @@
 import streamlit as st
 from io import BytesIO
 from os.path import splitext
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Dict
 from palettable.cartocolors.qualitative import Prism_8
 from palettable.cartocolors.cartocolorspalette import CartoColorsMap
-from colorsys import rgb_to_hsv, hsv_to_rgb
+from colorsys import rgb_to_hsv, rgb_to_hls, hsv_to_rgb, hls_to_rgb
 
 from echemsuite.cellcycling.read_input import FileManager, Instrument
 from echemsuite.cellcycling.cycles import Cycle
-
 
 # %% Define functions to operate on colors
 
@@ -28,8 +27,8 @@ class ColorRGB:
         return self.r, self.g, self.b
 
     def saturate(self, replace: bool = False) -> Union[Tuple[int, int, int], None]:
-        h, _, v = rgb_to_hsv(self.r, self.g, self.b)
-        r, g, b = hsv_to_rgb(h, 1, v)
+        h, _, v = rgb_to_hsv(self.r / 255.0, self.g / 255.0, self.b / 255.0)
+        r, g, b = [int(255.0 * c) for c in hsv_to_rgb(h, 1.0, v)]
         if replace:
             self.r, self.g, self.b = r, g, b
         else:
@@ -41,9 +40,11 @@ class ColorRGB:
             raise ValueError
 
         r, g, b = self.saturate()
-        h, _, v = rgb_to_hsv(r, g, b)
-        s = index / (levels - 1)
-        return hsv_to_rgb(h, s, v)
+        h, _, s = rgb_to_hls(r / 255.0, g / 255.0, b / 255.0)
+        l = 0.9 - 0.6 * (index / (levels + 1))
+
+        r, g, b = [int(255 * c) for c in hls_to_rgb(h, l, s)]
+        return r, g, b
 
 
 def get_basecolor(palette: CartoColorsMap, index: int) -> ColorRGB:
@@ -150,14 +151,10 @@ class Experiment:
         # Load the files in the BytesIO stream buffer of the internal FileManager class
         bytestreams = {}
         for file in uploaded_files:
-            stream = BytesIO(file.getvalue())
-            try:
-                stream.read().decode("utf-8")
-            except:
-                pass
-            else:
-                stream.seek(0)
-                bytestreams[file.name] = stream
+            original = BytesIO(file.getvalue())
+            decoded = original.read().decode("utf-8", errors="ignore")
+            unicode_text = "".join([char for char in decoded if ord(char) < 128])
+            bytestreams[file.name] = BytesIO(unicode_text.encode("utf-8"))
 
         self._manager.bytestreams = bytestreams
         self._manager.parse()
@@ -181,6 +178,7 @@ class Experiment:
 
         # Set other class values
         self._volume = None  # Volume of the electrolite in liters
+        self._skipped_files = 0
 
     def __iadd__(self, source):
         if type(source) != Experiment:
@@ -264,13 +262,13 @@ class Experiment:
     @property
     def clean(self):
         return self._clean
-    
+
     @clean.setter
     def clean(self, value: bool):
         if type(value) != bool:
             raise TypeError
         self._clean = value
-    
+
     @property
     def cycles(self) -> List[Cycle]:
         self._manager.parse()
@@ -300,6 +298,9 @@ class ProgramStatus:
         for experiment in self._experiments:
             yield experiment
 
+    def __len__(self) -> int:
+        return len(self._experiments)
+
     def get_experiment_names(self) -> List[str]:
         return [obj.name for obj in self._experiments]
 
@@ -323,3 +324,60 @@ class ProgramStatus:
     @property
     def number_of_experiments(self):
         return len(self._experiments)
+
+
+# %% DEFINE EXPERIMENT SELECTOR
+
+
+class ExperimentSelector:
+    def __init__(self) -> None:
+        self.view: Dict[str, List[int]] = {}
+
+    def __getitem__(self, name: str) -> List[int]:
+        if name in self.view:
+            return self.view[name]
+        else:
+            raise ValueError
+
+    def __setitem__(self, name: str, mylist: List[int]) -> None:
+
+        status: ProgramStatus = st.session_state["ProgramStatus"]
+
+        for number in mylist:
+            id = status.get_index_of(name)
+            if number < 0 or number >= len(status[id].manager.get_cycles()):
+                raise ValueError
+
+        self.view[name] = mylist
+
+    def __len__(self):
+        return len(self.view)
+
+    def set(self, name: str, cycles: Union[List[int], None] = None) -> None:
+
+        status: ProgramStatus = st.session_state["ProgramStatus"]
+
+        if name not in status.get_experiment_names():
+            raise ValueError
+
+        id = status.get_index_of(name)
+        
+        if cycles is None:
+            self.view[name] = [cycle.number for cycle in status[id].manager.get_cycles()]
+        else:
+            self.view[name] = cycles
+
+    def remove(self, name: str):
+        if name in self.view:
+            del self.view[name]
+
+    def clear(self):
+        self.view = {}
+
+    @property
+    def names(self) -> List[str]:
+        return self.view.keys()
+
+    @property
+    def is_empty(self):
+        return True if len(self) == 0 else False

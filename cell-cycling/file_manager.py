@@ -96,14 +96,36 @@ with upload_tab:
 
             # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
             st.session_state["UploadConfirmation"][0] = new_experiment.name
-            if len(new_experiment.manager.bytestreams) != len(
-                new_experiment.manager.halfcycles
-            ):
+
+            if new_experiment.manager.instrument == "GAMRY":
+                if len(new_experiment.manager.bytestreams) != len(
+                    new_experiment.manager.halfcycles
+                ):
+                    skipped_files = []
+                    for filename in new_experiment.manager.bytestreams.keys():
+                        if filename not in new_experiment.manager.halfcycles.keys():
+                            skipped_files.append(filename)
+                    st.session_state["UploadConfirmation"][1] = skipped_files
+
+            elif new_experiment.manager.instrument == "BIOLOGIC":
                 skipped_files = []
                 for filename in new_experiment.manager.bytestreams.keys():
-                    if filename not in new_experiment.manager.halfcycles.keys():
+                    find = False
+                    for search in new_experiment.manager.halfcycles.keys():
+                        if filename in search:
+                            find = True
+                            break
+
+                    if find is False:
                         skipped_files.append(filename)
-                st.session_state["UploadConfirmation"][1] = skipped_files
+                if skipped_files != []:
+                    st.session_state["UploadConfirmation"][1] = skipped_files
+
+            else:
+                raise RuntimeError
+
+            if skipped_files != []:
+                status[status.get_index_of(name)]._skipped_files += len(skipped_files)
 
             # Rerun the page to force update
             st.experimental_rerun()
@@ -448,14 +470,10 @@ with inspector_tab:
             st.metric("Uploaded files", value=len(experiment.manager.bytestreams))
 
         with c2:
-            st.metric("Parsed files", value=len(experiment.manager.halfcycles))
+            st.metric("Parsed halfcycles", value=len(experiment.manager.halfcycles))
 
         with c3:
-            st.metric(
-                "Skipped files",
-                value=len(experiment.manager.bytestreams)
-                - len(experiment.manager.halfcycles),
-            )
+            st.metric("Skipped files", value=experiment._skipped_files)
 
         with c4:
             st.metric(
@@ -487,8 +505,21 @@ with inspector_tab:
                     with col2:
                         st.write(filename)
                     with col3:
-                        if filename in experiment.manager.halfcycles.keys():
+
+                        if (
+                            experiment.manager.instrument == "GAMRY"
+                            and filename in experiment.manager.halfcycles.keys()
+                        ):
                             st.write("🟢 PARSED")
+
+                        elif experiment.manager.instrument == "BIOLOGIC" and any(
+                            [
+                                filename in key
+                                for key in experiment.manager.halfcycles.keys()
+                            ]
+                        ):
+                            st.write("🟢 PARSED")
+
                         else:
                             st.write("🔴 SKIPPED")
 
