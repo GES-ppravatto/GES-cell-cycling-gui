@@ -1,9 +1,29 @@
 import streamlit as st
 import numpy as np
+import pandas as pd
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
 from core.gui_core import Experiment, ProgramStatus, ExperimentSelector, RGB_to_HEX
+from echemsuite.cellcycling.cycles import HalfCycle
+
+HALFCYCLE_SERIES = ["time (s)", "voltage (V)", "current (A)", "charge (mAh)", "energy (mWh)"]
+
+def get_halfcycle_series(halfcycle: HalfCycle, title: str) -> pd.Series:
+    if title == "time (s)":
+        return halfcycle.time
+    elif title == "voltage (V)":
+        return halfcycle.voltage
+    elif title == "current (A)":
+        return halfcycle.current
+    elif title == "charge (mAh)":
+        return halfcycle.Q
+    elif title == "energy (mWh)":
+        return halfcycle.energy
+    else:
+        raise ValueError
+
+
 
 enable = True
 if "ProgramStatus" not in st.session_state:
@@ -130,11 +150,31 @@ if enable:
                             new_cycle_list.append(cycle.number)
                     view_settings[current_view] = new_cycle_list
 
-        st.markdown("### Experiment plots")
-
+    
     view_settings: ExperimentSelector = st.session_state["CyclePlotSelection"]
 
     if not view_settings.is_empty:
+
+        st.markdown("### Experiment plots")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.markdown("###### x axis options")
+            x_axis = st.selectbox("Select the series x axis", HALFCYCLE_SERIES)
+        
+        with col2:
+            st.markdown("###### y axis options")
+            y_axis = st.selectbox("Select the series y axis", [element for element in HALFCYCLE_SERIES if element != x_axis])
+        
+        with col3:
+            st.markdown("###### other options")
+            show_charge = st.checkbox("Show charge", value=True)
+            show_discharge = st.checkbox("Show discharge", value=True)
+            reverse = st.checkbox("Reversed colorscale", value=True)
+            
+
+        st.markdown("---")
 
         fig = make_subplots(cols=1, rows=len(view_settings))
 
@@ -147,15 +187,19 @@ if enable:
             num_traces = len(view_settings[name])
             for trace_id, cycle_id in enumerate(view_settings[name]):
 
-                shade = RGB_to_HEX(*experiment.color.get_shade(trace_id, num_traces))
+                shade = RGB_to_HEX(*experiment.color.get_shade(trace_id, num_traces, reversed=reverse))
 
                 cycle = cycles[cycle_id]
 
-                if cycle.charge is not None:
+                if cycle.charge is not None and show_charge is True:
+
+                    x_series = get_halfcycle_series(cycle.charge, x_axis)
+                    y_series = get_halfcycle_series(cycle.charge, y_axis)
+
                     fig.add_trace(
                         go.Scatter(
-                            x=cycle.charge.time,
-                            y=cycle.charge.voltage,
+                            x=x_series,
+                            y=y_series,
                             line=dict(color=shade, dash="dot"),
                             name=f"charge cycle {cycle_id}",
                         ),
@@ -163,11 +207,15 @@ if enable:
                         col=1,
                     )
 
-                if cycle.discharge is not None:
+                if cycle.discharge is not None and show_discharge is True:
+
+                    x_series = get_halfcycle_series(cycle.discharge, x_axis)
+                    y_series = get_halfcycle_series(cycle.discharge, y_axis)
+
                     fig.add_trace(
                         go.Scatter(
-                            x=cycle.discharge.time,
-                            y=cycle.discharge.voltage,
+                            x=x_series,
+                            y=y_series,
                             line=dict(color=shade),
                             name=f"discharge cycle {cycle_id}",
                         ),
@@ -176,25 +224,28 @@ if enable:
                     )
 
         fig.update_xaxes(
-            title_text="Time (s)",
+            title_text=x_axis,
             showline=True,
             linecolor="black",
             gridwidth=1,
             gridcolor="#DDDDDD",
         )
+
         fig.update_yaxes(
-            title_text="Voltage (V)",
-            secondary_y=False,
+            title_text=y_axis,
             showline=True,
             linecolor="black",
             gridwidth=1,
             gridcolor="#DDDDDD",
         )
+
         fig.update_layout(
             plot_bgcolor="#FFFFFF",
         )
 
         st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("---")
 
 
 else:
