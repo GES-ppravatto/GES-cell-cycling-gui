@@ -7,7 +7,14 @@ import plotly.graph_objects as go
 from core.gui_core import Experiment, ProgramStatus, ExperimentSelector, RGB_to_HEX
 from echemsuite.cellcycling.cycles import HalfCycle
 
-HALFCYCLE_SERIES = ["time (s)", "voltage (V)", "current (A)", "charge (mAh)", "energy (mWh)"]
+HALFCYCLE_SERIES = [
+    "time (s)",
+    "voltage (V)",
+    "current (A)",
+    "charge (mAh)",
+    "energy (mWh)",
+]
+
 
 def get_halfcycle_series(halfcycle: HalfCycle, title: str) -> pd.Series:
     if title == "time (s)":
@@ -22,7 +29,6 @@ def get_halfcycle_series(halfcycle: HalfCycle, title: str) -> pd.Series:
         return halfcycle.energy
     else:
         raise ValueError
-
 
 
 enable = True
@@ -136,21 +142,17 @@ if enable:
                     view_settings = st.session_state["CyclePlotSelection"]
                     id = status.get_index_of(current_view)
                     cycles = status[id].manager.get_cycles()
-                    new_cycle_list = []
-                    for cycle in cycles:
-                        selection = st.checkbox(
-                            f"Cycle n° {cycle.number}",
-                            value=(
-                                True
-                                if cycle.number in view_settings[current_view]
-                                else False
-                            ),
-                        )
-                        if selection:
-                            new_cycle_list.append(cycle.number)
-                    view_settings[current_view] = new_cycle_list
+                    view_settings[current_view] = st.multiselect(
+                        "Select the cycles",
+                        [obj.number for obj in cycles],
+                        default=view_settings[current_view],
+                    )
 
-    
+                    clear_current_view = st.button("Remove All")
+                    if clear_current_view:
+                        view_settings[current_view] = []
+                        st.experimental_rerun()
+
     view_settings: ExperimentSelector = st.session_state["CyclePlotSelection"]
 
     if not view_settings.is_empty:
@@ -162,17 +164,22 @@ if enable:
         with col1:
             st.markdown("###### x axis options")
             x_axis = st.selectbox("Select the series x axis", HALFCYCLE_SERIES)
-        
+
         with col2:
             st.markdown("###### y axis options")
-            y_axis = st.selectbox("Select the series y axis", [element for element in HALFCYCLE_SERIES if element != x_axis])
-        
+            y_axis = st.selectbox(
+                "Select the series y axis",
+                [element for element in HALFCYCLE_SERIES if element != x_axis],
+            )
+
         with col3:
             st.markdown("###### other options")
             show_charge = st.checkbox("Show charge", value=True)
             show_discharge = st.checkbox("Show discharge", value=True)
             reverse = st.checkbox("Reversed colorscale", value=True)
-            
+            plot_height = st.number_input(
+                "Plot height", min_value=10, max_value=1000, value=400, step=10
+            )
 
         st.markdown("---")
 
@@ -187,7 +194,9 @@ if enable:
             num_traces = len(view_settings[name])
             for trace_id, cycle_id in enumerate(view_settings[name]):
 
-                shade = RGB_to_HEX(*experiment.color.get_shade(trace_id, num_traces, reversed=reverse))
+                shade = RGB_to_HEX(
+                    *experiment.color.get_shade(trace_id, num_traces, reversed=reverse)
+                )
 
                 cycle = cycles[cycle_id]
 
@@ -240,7 +249,7 @@ if enable:
         )
 
         fig.update_layout(
-            plot_bgcolor="#FFFFFF",
+            plot_bgcolor="#FFFFFF", height=plot_height * len(view_settings.names)
         )
 
         st.plotly_chart(fig, use_container_width=True)
