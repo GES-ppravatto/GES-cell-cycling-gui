@@ -1,5 +1,6 @@
-import streamlit as st
 from __future__ import annotations
+import math
+import streamlit as st
 from io import BytesIO
 from os.path import splitext
 from typing import List, Tuple, Union, Dict
@@ -605,7 +606,7 @@ class ProgramStatus:
 
 class ExperimentSelector:
     """
-    Service class used to select a set of experiment to be analyzed and specify for each of 
+    Service class used to select a set of experiment to be analyzed and specify for each of
     them a subset of cycles to be exaimend.
 
     Attributes
@@ -613,8 +614,9 @@ class ExperimentSelector:
         view : Dict[str, List[int]]
             dictionary containing the name of the experiment and the list of cycle to show
     """
+
     def __init__(self) -> None:
-        self.view: Dict[str, List[int]] = {}    #set the disctionary as initially empty
+        self.view: Dict[str, List[int]] = {}  # set the disctionary as initially empty
 
     def __getitem__(self, name: str) -> List[int]:
         """
@@ -638,7 +640,7 @@ class ExperimentSelector:
                 a list to integers encoding the selected cycles
         """
 
-        #Fetch from the GUI session state variable the ProgramStatus object 
+        # Fetch from the GUI session state variable the ProgramStatus object
         status: ProgramStatus = st.session_state["ProgramStatus"]
 
         # Check that all the given cycle index ar valid
@@ -670,21 +672,25 @@ class ExperimentSelector:
                 list to the given one.
         """
 
-        #Fetch from the GUI session state variable the ProgramStatus object 
+        # Fetch from the GUI session state variable the ProgramStatus object
         status: ProgramStatus = st.session_state["ProgramStatus"]
 
-        #Chech if the name of the experiment exist in the program memory
+        # Chech if the name of the experiment exist in the program memory
         if name not in status.get_experiment_names():
             raise ValueError
 
-        #Get the index of the experiment in the status memory
+        # Get the index of the experiment in the status memory
         id = status.get_index_of(name)
 
-        #If cycles is None include all the available cycles in the experiment
+        # If cycles is None include all the available cycles in the experiment
         if cycles is None:
-            self.view[name] = [cycle.number for cycle in status[id].manager.get_cycles()]
-        
-        #Else use only the specified ones
+            cycle_list = status[id].manager.get_cycles()
+            stride = int(math.ceil(len(cycle_list) / 10))
+            self.view[name] = [
+                cycle.number for idx, cycle in enumerate(cycle_list) if idx % stride == 0
+            ]
+
+        # Else use only the specified ones
         else:
             self.view[name] = cycles
 

@@ -1,3 +1,4 @@
+import math
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -169,9 +170,14 @@ if enable:
                         step=1,
                     )
 
+                    guess_stride = int(math.ceil(max_cycle / 10))
                     # Show a number input to allow the selection of the stride
                     stride = st.number_input(
-                        "Stride", min_value=1, max_value=max_cycle, step=1
+                        "Stride",
+                        min_value=1,
+                        max_value=max_cycle,
+                        step=1,
+                        value=guess_stride,
                     )
 
                     apply = st.button("✅ Apply")

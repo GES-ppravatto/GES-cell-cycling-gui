@@ -85,6 +85,8 @@ with upload_tab:
             # Set the name selected by the user if existing
             if name != "":
                 new_experiment.name = name
+            else:
+                name = new_experiment.name
 
             # If the selected action is "Create new experiment" add the new experiment to the ProgramStatus
             if action == "Create new experiment":
