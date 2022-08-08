@@ -3,7 +3,7 @@ import math
 import streamlit as st
 from io import BytesIO
 from os.path import splitext
-from typing import List, Tuple, Union, Dict
+from typing import List, Tuple, Union, Dict, Any
 from palettable.cartocolors.qualitative import Prism_8
 from palettable.cartocolors.cartocolorspalette import CartoColorsMap
 from colorsys import rgb_to_hsv, rgb_to_hls, hsv_to_rgb, hls_to_rgb
@@ -604,6 +604,18 @@ class ProgramStatus:
 # %% DEFINE EXPERIMENT SELECTOR
 
 
+class CycleFormat:
+    def __init__(self, number, label=None) -> None:
+        self.number = number
+        if label is not None:
+            self.label = label
+        else:
+            self.set_default_label()
+    
+    def set_default_label(self) -> None:
+        self.label = f"Cycle {self.number}"
+
+
 class ExperimentSelector:
     """
     Service class used to select a set of experiment to be analyzed and specify for each of
@@ -611,12 +623,14 @@ class ExperimentSelector:
 
     Attributes
     ----------
-        view : Dict[str, List[int]]
-            dictionary containing the name of the experiment and the list of cycle to show
+        view : Dict[str, List[CycleFormat]]
+            dictionary containing the name of the experiment and the list of cycle properties
     """
 
     def __init__(self) -> None:
-        self.view: Dict[str, List[int]] = {}  # set the disctionary as initially empty
+        self.view: Dict[
+            str, List[CycleFormat]
+        ] = {}  # set the dictionary as initially empty
 
     def __getitem__(self, name: str) -> List[int]:
         """
@@ -624,33 +638,10 @@ class ExperimentSelector:
         """
         # return the cycle view for the experiment if existent else raise an exception
         if name in self.view:
-            return self.view[name]
+            cycle_ids = [obj.number for obj in self.view[name]]
+            return cycle_ids
         else:
             raise ValueError
-
-    def __setitem__(self, name: str, mylist: List[int]) -> None:
-        """
-        Set the cycle list correspondent to a given experiment to a user specified state.
-
-        Arguments
-        ---------
-            name : str
-                the name of the experiment
-            mylist : List[int]
-                a list to integers encoding the selected cycles
-        """
-
-        # Fetch from the GUI session state variable the ProgramStatus object
-        status: ProgramStatus = st.session_state["ProgramStatus"]
-
-        # Check that all the given cycle index ar valid
-        for number in mylist:
-            id = status.get_index_of(name)
-            if number < 0 or number >= len(status[id].manager.get_cycles()):
-                raise ValueError
-
-        # Set the view for the given experiment
-        self.view[name] = mylist
 
     def __len__(self):
         """
@@ -658,7 +649,12 @@ class ExperimentSelector:
         """
         return len(self.view)
 
-    def set(self, name: str, cycles: Union[List[int], None] = None) -> None:
+    def set(
+        self,
+        name: str,
+        cycles: Union[List[int], None] = None,
+        labels: Union[List[str], None] = None,
+    ) -> None:
         """
         Set a new experiment either by specifying a cycle list or by default.
 
@@ -670,6 +666,9 @@ class ExperimentSelector:
                 if set to None will automatially trigger the inclusion of all the cycles
                 available in the experiment. If equal to a list of integers, set the cycles
                 list to the given one.
+            labels : Union[List[str], None]
+                if set to None will automatically provide a list of default labels. If equal
+                to a list of stings, sets the label associated to each series.
         """
 
         # Fetch from the GUI session state variable the ProgramStatus object
@@ -686,13 +685,45 @@ class ExperimentSelector:
         if cycles is None:
             cycle_list = status[id].manager.get_cycles()
             stride = int(math.ceil(len(cycle_list) / 10))
-            self.view[name] = [
+            cycles = [
                 cycle.number for idx, cycle in enumerate(cycle_list) if idx % stride == 0
             ]
 
-        # Else use only the specified ones
+        # Else, check that all the given cycle index ar valid
         else:
-            self.view[name] = cycles
+            for number in cycles:
+                if number < 0 or number >= len(status[id].manager.get_cycles()):
+                    raise ValueError
+
+        # If labels are provided check that the list length match and apply the given labels
+        if labels is not None:
+            if len(labels) != len(cycles):
+                raise RuntimeError
+            self.view[name] = [
+                CycleFormat(idx, label) for idx, label in zip(cycles, labels)
+            ]
+
+        # If no labels are provided generate a default set
+        else:
+            
+            # If the view already exist generate only the missing labels
+            if name in self.view:
+                current_cycles = [obj.number for obj in self.view[name]]
+                current_lables = [obj.label for obj in self.view[name]]
+
+                updated_view = []
+                for idx in cycles:
+                    if idx in current_cycles:
+                        position = current_cycles.index(idx)
+                        updated_view.append(CycleFormat(idx, current_lables[position]))
+                    else:
+                        updated_view.append(CycleFormat(idx))
+                self.view[name] = updated_view
+            
+            # Else create a new default view labelling
+            else:
+                self.view[name] = [CycleFormat(idx) for idx in cycles]
+
 
     def remove(self, name: str):
         """
@@ -711,6 +742,82 @@ class ExperimentSelector:
         Clear all the view
         """
         self.view = {}
+
+    def set_cycle_label(self, name: str, index: int, label: str) -> None:
+        """
+        Sets the label associated to a given cycle
+
+        Arguments
+        ---------
+            name : str
+                name of the experiment to which the cycle belongs to
+            index : int
+                index of the target cycle (number of the cycle in the experiment)
+            label : str
+                the lable that must be set
+        """
+        if name not in self.view:
+            raise ValueError
+
+        if index not in [obj.number for obj in self.view[name]]:
+            raise ValueError
+        
+        idx = self[name].index(index)
+        self.view[name][idx].label = label
+    
+    def reset_default_labels(self, name: str) -> None:
+        """
+        Sets all the cycles lable of an experiment to the default format.
+
+        Arguments
+        ---------
+            name : str
+                the name of the experiment
+        """
+        if name not in self.view.keys():
+            raise ValueError
+        
+        for obj in self.view[name]:
+            obj.set_default_label()
+    
+    def get_labels(self, name: str) -> None:
+        """
+        Gets the list of labels associated to the selected cycles in the experiment
+
+        Arguments
+        ---------
+            name : str
+                name of the experiment
+        """
+        if name not in self.view:
+            raise ValueError
+
+        return [obj.label for obj in self.view[name]]
+    
+    def get_label(self, name: str, index: int) -> str:
+        """
+        Gets the label associated to the selected cycle
+
+        Arguments
+        ---------
+            name : str
+                name of the experiment to which the cycle belongs to
+            index : int
+                number of the cycle in the corresponding experiment
+        
+        Returns
+        -------
+            str
+                label associate to the experiment
+        """
+
+        if name not in self.view:
+            raise ValueError
+        
+        idx = self[name].index(index)
+        return self.view[name][idx].label
+
+
 
     @property
     def names(self) -> List[str]:

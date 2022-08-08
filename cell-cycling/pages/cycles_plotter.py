@@ -5,8 +5,15 @@ import pandas as pd
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
-from core.gui_core import Experiment, ProgramStatus, ExperimentSelector, RGB_to_HEX
+from core.gui_core import (
+    Experiment,
+    ProgramStatus,
+    ExperimentSelector,
+    CycleFormat,
+    RGB_to_HEX,
+)
 from echemsuite.cellcycling.cycles import HalfCycle
+
 
 # %% Definition of labels and functions specific to the cycles plotting
 HALFCYCLE_SERIES = [
@@ -45,6 +52,114 @@ def get_halfcycle_series(halfcycle: HalfCycle, title: str) -> pd.Series:
         raise ValueError
 
 
+# %% Define function to generate the cycle figure
+def generate_plotly_figure(
+    x_axis: str,
+    y_axis: str,
+    width: int = 800,
+    plot_height: int = 400,
+    shared_x: bool = False,
+):
+
+    status: ProgramStatus = st.session_state["ProgramStatus"]
+    selected_experiments: ExperimentSelector = st.session_state["CyclePlotSelection"]
+
+    # Create a figure with a number of subplots equal to the numebr of selected experiments
+    fig = make_subplots(
+        cols=1,
+        rows=len(selected_experiments),
+        shared_xaxes=shared_x,
+        vertical_spacing=0.01 if shared_x else None,
+    )
+
+    # For eache experiment update the correspondent subplot
+    for index, name in enumerate(selected_experiments.names):
+
+        # Get the cycle list from the experiment
+        id = status.get_index_of(name)
+        experiment: Experiment = status[id]
+        cycles = experiment.manager.get_cycles()
+
+        # Get the user selected cycles and plot only the corresponden lines
+        num_traces = len(selected_experiments[name])
+        for trace_id, cycle_id in enumerate(selected_experiments[name]):
+
+            # Get the shade associated to the current trace
+            shade = RGB_to_HEX(
+                *experiment.color.get_shade(trace_id, num_traces, reversed=reverse)
+            )
+
+            # extract the cycle given the id selected
+            cycle = cycles[cycle_id]
+
+            # Print the charge halfcycle
+            if cycle.charge is not None and show_charge is True:
+
+                series_name = selected_experiments.get_label(name, cycle_id)
+
+                x_series = get_halfcycle_series(cycle.charge, x_axis)
+                y_series = get_halfcycle_series(cycle.charge, y_axis)
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=x_series,
+                        y=y_series,
+                        line=dict(color=shade),
+                        name=series_name,
+                    ),
+                    row=index + 1,
+                    col=1,
+                )
+
+            # Print the discharge halfcycle
+            if cycle.discharge is not None and show_discharge is True:
+
+                x_series = get_halfcycle_series(cycle.discharge, x_axis)
+                y_series = get_halfcycle_series(cycle.discharge, y_axis)
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=x_series,
+                        y=y_series,
+                        line=dict(color=shade),
+                        name=series_name,
+                        showlegend=False if cycle.charge else True,
+                    ),
+                    row=index + 1,
+                    col=1,
+                )
+
+    # Update the settings of the x-axis
+    fig.update_xaxes(
+        title_text=x_axis,
+        showline=True,
+        linecolor="black",
+        gridwidth=1,
+        gridcolor="#DDDDDD",
+    )
+
+    # Update the settings of the y-axis
+    fig.update_yaxes(
+        title_text=y_axis,
+        showline=True,
+        linecolor="black",
+        gridwidth=1,
+        gridcolor="#DDDDDD",
+    )
+
+    # Update the settings of plot layout
+    fig.update_layout(
+        plot_bgcolor="#FFFFFF",
+        height=plot_height * len(selected_experiments.names),
+        width=width,
+        font=dict(size=font_size),
+    )
+
+    return fig
+
+
+# %% Definition of the page GUI
+
 # Check if the main page has set up the proper session state variables and check that at
 # least one experiment has been loaded
 enable = True
@@ -59,6 +174,16 @@ else:
 # and chache it in the session state
 if "CyclePlotSelection" not in st.session_state:
     st.session_state["CyclePlotSelection"] = ExperimentSelector()
+    st.session_state["ManualSelectorBuffer"] = []
+
+
+def clean_manual_selection_buffer():
+    st.session_state["ManualSelectorBuffer"] = []
+
+
+# Fetch a fresh instance of the Progam Status and Experiment Selection variables from the session state
+status: ProgramStatus = st.session_state["ProgramStatus"]
+selected_experiments: ExperimentSelector = st.session_state["CyclePlotSelection"]
 
 
 # Set the title of the page and print some generic instruction
@@ -72,14 +197,8 @@ st.write(
 # If there is one or more experiment loaded in the buffer start the plotter GUI
 if enable:
 
-    # Fetch a fresh instance of the progam status from the session state
-    status: ProgramStatus = st.session_state["ProgramStatus"]
-
     # Define a container to hold the experiment selection box
     with st.container():
-
-        # Fetch a fresh instance of the Experiment Selection variable from the session state
-        selected_experiments: ExperimentSelector = st.session_state["CyclePlotSelection"]
 
         selection = None  # Experiment selected
         col1, col2 = st.columns([4, 1])
@@ -106,48 +225,48 @@ if enable:
     st.markdown("---")
 
     # If the Experiment selector is not empty show to the user the cycle selector interface
-    if st.session_state["CyclePlotSelection"].is_empty == False:
-
-        # Fetch a fresh instance of the Experiment Selection variable from the session state
-        selected_experiments: ExperimentSelector = st.session_state["CyclePlotSelection"]
+    if selected_experiments.is_empty == False:
 
         # Create an expander holding the Cycle selection options
-        with st.expander("Visualization options", expanded=True):
+        with st.expander("Cycle selector/editor", expanded=False):
 
-            col1, col2 = st.columns(2)
+            col1, col2 = st.columns(2, gap="medium")
 
             # Create a column in which the user can select the experiment to manipulate
             with col1:
-                # Show a radio button to allow the selection of the wanted experiment
+                # Show a selectbox button to allow the selection of the wanted experiment
                 st.markdown("###### Loaded experiments selector")
-                current_view = st.radio(
+                current_view = st.selectbox(
                     "Select the experiment to edit",
                     selected_experiments.names,
+                    on_change=clean_manual_selection_buffer,
                 )
 
-                st.markdown("---")
-
                 # Show a button to remove the selected experiment from the view
-                st.markdown("###### View options")
                 remove_current = st.button("➖ Remove from view")
                 if remove_current:
                     index = selected_experiments.remove(current_view)
                     st.experimental_rerun()  # Rerun the page to update the GUI
 
+                st.markdown("---")
+
+                # Show a selector allowing the user to choose how to set the cycles view
+                st.markdown("###### Mode of operation")
+                view_mode = st.radio(
+                    "Select the mode of operation",
+                    [
+                        "Constant-interval cycle selector",
+                        "Manual cycle selector",
+                        "Data series editor",
+                    ],
+                )
+
             # Create a column based on the selections made in the first one in which the
             # user can select the desired cycles
             with col2:
 
-                # Show a selector allowing the user to choose how to set the cycles view
-                st.markdown("###### Cycle selector mode")
-                view_mode = st.radio(
-                    "Select the mode of operation", ["Constant interval", "Manual"]
-                )
-
-                st.markdown("---")
-
                 # Show the appropriate selection box
-                if view_mode == "Constant interval":
+                if view_mode == "Constant-interval cycle selector":
 
                     st.markdown("###### Constant interval cycle selector")
 
@@ -186,144 +305,135 @@ if enable:
                             current_view, np.arange(start, stop + 1, step=stride)
                         )
 
-                else:
+                elif view_mode == "Manual cycle selector":
                     st.markdown("###### Manual cycle selector")
+
+                    # When empty, fill the temorary selection buffer with the selected
+                    # experiment object content
+                    if st.session_state["ManualSelectorBuffer"] == []:
+                        st.session_state["ManualSelectorBuffer"] = selected_experiments[
+                            current_view
+                        ]
 
                     # Get the complete cycle list associated to the selected experiment
                     id = status.get_index_of(current_view)
                     cycles = status[id].manager.get_cycles()
 
                     # Show a multiple selection box with all the available cycles in which
-                    # the user can manually add or remove a cycle
-                    selected_experiments[current_view] = st.multiselect(
+                    # the user can manually add or remove a cycle, save the new list in a
+                    # temporary buffer used on the proper rerun
+                    st.session_state["ManualSelectorBuffer"] = st.multiselect(
                         "Select the cycles",
                         [obj.number for obj in cycles],
-                        default=selected_experiments[current_view],
+                        default=st.session_state["ManualSelectorBuffer"],
                     )
 
+                    # If the temporary buffer is found to be different from the one currently
+                    # set for the current view, update the current view
+                    if (
+                        st.session_state["ManualSelectorBuffer"]
+                        != selected_experiments[current_view]
+                    ):
+                        selected_experiments.set(
+                            current_view, cycles=st.session_state["ManualSelectorBuffer"]
+                        )
+                        st.experimental_rerun()
+
                     # Print a remave all button to allow the user to remove alle the selected cycles
-                    clear_current_view = st.button("Remove All")
+                    clear_current_view = st.button("🧹 Clear All")
                     if clear_current_view:
                         selected_experiments[current_view] = []
                         st.experimental_rerun()  # Rerun to update the GUI
 
-    # Fetch a fresh instance of the Experiment Selection variable from the session state
-    selected_experiments: ExperimentSelector = st.session_state["CyclePlotSelection"]
+                else:
+                    st.markdown("###### Data series editor")
+
+                    reset = st.button("🧹 Reset all names")
+                    if reset:
+                        selected_experiments.reset_default_labels(current_view)
+
+                    selected_series = st.selectbox(
+                        "Select the cycle series to edit",
+                        selected_experiments[current_view],
+                    )
+
+                    current_label = selected_experiments.get_label(
+                        current_view, selected_series
+                    )
+                    new_label = st.text_input(
+                        "Select the new label for the series", value=current_label
+                    )
+
+                    apply = st.button("✅ Apply")
+                    if apply and new_label != "":
+                        selected_experiments.set_cycle_label(
+                            current_view, selected_series, new_label
+                        )
 
     # If there are selected experiment in the buffer start the plot operations
     if not selected_experiments.is_empty:
 
-        # Print a header section in which the user can select the plotting options
-        st.markdown("### Experiment plots")
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.markdown("###### x axis options")
-            x_axis = st.selectbox("Select the series x axis", HALFCYCLE_SERIES)
+        col1, col2 = st.columns([4, 1])
 
         with col2:
-            st.markdown("###### y axis options")
+
+            st.markdown("#### Plot options")
+
+            st.markdown("###### Axis")
+            x_axis = st.selectbox("Select the series x axis", HALFCYCLE_SERIES)
             y_axis = st.selectbox(
                 "Select the series y axis",
                 [element for element in HALFCYCLE_SERIES if element != x_axis],
             )
-
-        with col3:
-            st.markdown("###### other options")
-            show_charge = st.checkbox("Show charge", value=True)
-            show_discharge = st.checkbox("Show discharge", value=True)
-            reverse = st.checkbox("Reversed colorscale", value=True)
-            plot_height = st.number_input(
-                "Plot height", min_value=10, max_value=1000, value=400, step=10
+            shared_x = st.checkbox(
+                "Use shared x-axis",
+                disabled=True if len(selected_experiments) == 1 else False,
             )
 
-        st.markdown("---")
+            st.markdown("###### Series")
+            show_charge = st.checkbox("Show charge", value=True)
+            show_discharge = st.checkbox("Show discharge", value=True)
 
-        # Create a figure with a number of subplots equal to the numebr of selected experiments
-        fig = make_subplots(cols=1, rows=len(selected_experiments))
+            st.markdown("###### Aspect")
+            reverse = st.checkbox("Reversed colorscale", value=True)
+            font_size = st.number_input("Label font size", min_value=4, value=10)
+            plot_height = st.number_input(
+                "Subplot height", min_value=10, max_value=1000, value=500, step=10
+            )
 
-        # For eache experiment update the correspondent subplot
-        for index, name in enumerate(selected_experiments.names):
+            st.markdown("###### Export")
+            format = st.selectbox(
+                "Select the format of the file", ["png", "jpeg", "svg", "pdf"]
+            )
 
-            # Get the cycle list from the experiment
-            id = status.get_index_of(name)
-            experiment: Experiment = status[id]
-            cycles = experiment.manager.get_cycles()
+            suggested_width = int(2.5 * plot_height)
+            total_width = st.number_input(
+                "Total width",
+                min_value=10,
+                max_value=2000,
+                value=suggested_width if suggested_width <= 2000 else 2000,
+            )
 
-            # Get the user selected cycles and plot only the corresponden lines
-            num_traces = len(selected_experiments[name])
-            for trace_id, cycle_id in enumerate(selected_experiments[name]):
+            export_fig = generate_plotly_figure(
+                x_axis,
+                y_axis,
+                width=total_width,
+                plot_height=plot_height,
+                shared_x=shared_x,
+            )
 
-                # Get the shade associated to the current trace
-                shade = RGB_to_HEX(
-                    *experiment.color.get_shade(trace_id, num_traces, reversed=reverse)
-                )
+            st.download_button(
+                "Download plot",
+                data=export_fig.to_image(format=format),
+                file_name=f"cycle_plot.{format}",
+            )
 
-                # extract the cycle given the id selected
-                cycle = cycles[cycle_id]
-
-                # Print the charge halfcycle
-                if cycle.charge is not None and show_charge is True:
-
-                    x_series = get_halfcycle_series(cycle.charge, x_axis)
-                    y_series = get_halfcycle_series(cycle.charge, y_axis)
-
-                    fig.add_trace(
-                        go.Scatter(
-                            x=x_series,
-                            y=y_series,
-                            line=dict(color=shade, dash="dot"),
-                            name=f"charge cycle {cycle_id}",
-                        ),
-                        row=index + 1,
-                        col=1,
-                    )
-
-                # Print the discharge halfcycle
-                if cycle.discharge is not None and show_discharge is True:
-
-                    x_series = get_halfcycle_series(cycle.discharge, x_axis)
-                    y_series = get_halfcycle_series(cycle.discharge, y_axis)
-
-                    fig.add_trace(
-                        go.Scatter(
-                            x=x_series,
-                            y=y_series,
-                            line=dict(color=shade),
-                            name=f"discharge cycle {cycle_id}",
-                        ),
-                        row=index + 1,
-                        col=1,
-                    )
-
-        # Update the settings of the x-axis
-        fig.update_xaxes(
-            title_text=x_axis,
-            showline=True,
-            linecolor="black",
-            gridwidth=1,
-            gridcolor="#DDDDDD",
-        )
-
-        # Update the settings of the y-axis
-        fig.update_yaxes(
-            title_text=y_axis,
-            showline=True,
-            linecolor="black",
-            gridwidth=1,
-            gridcolor="#DDDDDD",
-        )
-
-        # Update the settings of plot layout
-        fig.update_layout(
-            plot_bgcolor="#FFFFFF", height=plot_height * len(selected_experiments.names)
-        )
-
-        # Insert the plot in streamlit
-        st.plotly_chart(fig, use_container_width=True)
-
-        st.markdown("---")
+        with col1:
+            # Insert the plot in streamlit
+            fig = generate_plotly_figure(
+                x_axis, y_axis, None, plot_height=plot_height, shared_x=shared_x
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 # If there are no experiments in the buffer suggest to the user to load data form the main page
 else:
