@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 import math
 import streamlit as st
 from io import BytesIO
@@ -832,3 +833,13 @@ class ExperimentSelector:
         returns true if the view buffer is empty
         """
         return True if len(self) == 0 else False
+
+
+# %% Define dataclass to store a general plot series attriburtes for cycle comparison plot
+
+@dataclass
+class SingleCycleSeries:
+    label : str
+    experiment_name : str
+    cycle_id : int
+    hex_color : str = None
