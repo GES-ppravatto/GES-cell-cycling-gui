@@ -2,15 +2,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 import streamlit as st
+import plotly
 from io import BytesIO
 from os.path import splitext
-from typing import List, Tuple, Union, Dict, Any
+from typing import List, Tuple, Union, Dict
 from palettable.cartocolors.qualitative import Prism_8
 from palettable.cartocolors.cartocolorspalette import CartoColorsMap
 from colorsys import rgb_to_hsv, rgb_to_hls, hsv_to_rgb, hls_to_rgb
 
 from echemsuite.cellcycling.read_input import FileManager, Instrument
-from echemsuite.cellcycling.cycles import Cycle
+from echemsuite.cellcycling.cycles import Cycle, CellCycling
 
 # %% Define functions to operate on colors
 
@@ -166,6 +167,10 @@ def HEX_to_RGB(value: str) -> Tuple[int, int, int]:
     return tuple(int(value[i : i + lv // 3], 16) for i in range(0, lv, lv // 3))
 
 
+def get_plotly_color(index: int) -> str:
+    color_list = plotly.colors.qualitative.Plotly
+    return color_list[index % len(color_list)]
+
 # %% Define custom exceptions
 class MultipleExtensions(Exception):
     """
@@ -302,6 +307,11 @@ class Experiment:
         # Set the clean flag of the file manager to false
         self._clean = False
 
+        # Create a buffer for the cycle based objects
+        self._cycles = None
+        self._cellcycling = None
+        self._update_cycles_based_objects()
+
         # Get univocal ID based on the number of object constructed
         global _EXPERIMENT_INIT_COUNTER_
         self._id = _EXPERIMENT_INIT_COUNTER_
@@ -316,6 +326,10 @@ class Experiment:
         # Set other class values
         self._volume = None  # Volume of the electrolite in liters
         self._skipped_files = 0
+    
+    def _update_cycles_based_objects(self) -> None:
+        self._cycles = self._manager.get_cycles(self._ordering, self._clean)
+        self._cellcycling = self._manager.get_cellcycling(self._ordering, self._clean)
 
     def __iadd__(self, source: Experiment):
         """
@@ -335,6 +349,7 @@ class Experiment:
 
         # Parse the buffer to update all data
         self._manager.parse()
+        self._update_cycles_based_objects()
         return self
 
     def remove_file(self, filename: str) -> None:
@@ -351,6 +366,7 @@ class Experiment:
             del self._manager.bytestreams[filename]
             self._manager.parse()
             self._ordering = self._manager.suggest_ordering()
+            self._update_cycles_based_objects()
         else:
             raise ValueError
 
@@ -373,6 +389,7 @@ class Experiment:
         self._manager.bytestreams[filename] = bytestream
         if autoparse:
             self._manager.parse()
+            self._update_cycles_based_objects()
 
     @property
     def name(self) -> str:
@@ -459,6 +476,7 @@ class Experiment:
 
         # save the given ordering
         self._ordering = new_ordering
+        self._update_cycles_based_objects()
 
     @property
     def clean(self):
@@ -475,14 +493,21 @@ class Experiment:
         if type(value) != bool:
             raise TypeError
         self._clean = value
+        self._update_cycles_based_objects()
 
     @property
     def cycles(self) -> List[Cycle]:
         """
-        getter of the cycles with automatic call to parse
+        getter of the cycles list
         """
-        #self._manager.parse()
-        return self._manager.get_cycles(self._ordering, self._clean)
+        return self._cycles
+    
+    @property
+    def cellcycling(self) -> CellCycling:
+        """
+        getter of the cellcycling object
+        """
+        return self._cellcycling
 
 
 # %% Define the ProgramStatus class to univocally identify the status of the GUI

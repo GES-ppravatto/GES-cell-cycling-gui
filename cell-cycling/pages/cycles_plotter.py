@@ -3,7 +3,6 @@ import math
 import streamlit as st
 import numpy as np
 import pandas as pd
-import plotly
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -11,11 +10,11 @@ from core.gui_core import (
     Experiment,
     ProgramStatus,
     ExperimentSelector,
-    CycleFormat,
     SingleCycleSeries,
     RGB_to_HEX,
+    get_plotly_color
 )
-from echemsuite.cellcycling.cycles import HalfCycle, Cycle
+from echemsuite.cellcycling.cycles import HalfCycle
 
 
 # %% Definition of labels and functions specific to the cycles plotting
@@ -85,7 +84,7 @@ def generate_stacked_cycle_plot_figure(
         # Get the cycle list from the experiment
         id = status.get_index_of(name)
         experiment: Experiment = status[id]
-        cycles = experiment.manager.get_cycles()
+        cycles = experiment.cycles
 
         # Get the user selected cycles and plot only the corresponden lines
         num_traces = len(selected_experiments[name])
@@ -168,12 +167,6 @@ def generate_stacked_cycle_plot_figure(
 
 
 # %% Define function to generate the comparison-plot cycles figure and palette
-
-
-def get_plotly_color(index: int) -> str:
-    color_list = plotly.colors.qualitative.Plotly
-    return color_list[index % len(color_list)]
-
 
 def generate_comparison_cycle_plot_figure(
     x_axis: str, y_axis: str, width: int = 800, height: int = 400, font_size: int = 14
@@ -390,7 +383,7 @@ if enable:
                         st.markdown("###### Constant interval cycle selector")
 
                         id = status.get_index_of(current_view)
-                        max_cycle = len(status[id].manager.get_cycles()) - 1
+                        max_cycle = len(status[id].cycles) - 1
 
                         # Show a number input to allow the selection of the start point
                         start = st.number_input(
@@ -437,7 +430,7 @@ if enable:
 
                         # Get the complete cycle list associated to the selected experiment
                         id = status.get_index_of(current_view)
-                        cycles = status[id].manager.get_cycles()
+                        cycles = status[id].cycles
 
                         # Show a multiple selection box with all the available cycles in which
                         # the user can manually add or remove a cycle, save the new list in a
