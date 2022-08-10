@@ -392,8 +392,9 @@ if enable:
 
                         # Show a number input to allow the selection of the start point
                         start = st.number_input(
-                            "Start", min_value=0, max_value=max_cycle - 1, step=1
+                            "Start", min_value=0, max_value=max_cycle - 1, step=1,
                         )
+                        start = int(start)
 
                         # Show a number input to allow the selection of the stop point, please
                         # notice how the stop point is excluded from the interval and, as such,
@@ -416,7 +417,7 @@ if enable:
                             value=guess_stride,
                         )
 
-                        apply = st.button("✅ Apply")
+                        apply = st.button("✅ Apply", key="comparison_apply")
                         if apply:
                             selected_experiments.set(
                                 current_view, np.arange(start, stop + 1, step=stride)
@@ -470,13 +471,13 @@ if enable:
                         if reset:
                             selected_experiments.reset_default_labels(current_view)
 
-                        selected_series = st.selectbox(
+                        selected_series_to_edit = st.selectbox(
                             "Select the cycle series to edit",
                             selected_experiments[current_view],
                         )
 
                         current_label = selected_experiments.get_label(
-                            current_view, selected_series
+                            current_view, selected_series_to_edit
                         )
                         new_label = st.text_input(
                             "Select the new label for the series", value=current_label
@@ -485,7 +486,7 @@ if enable:
                         apply = st.button("✅ Apply")
                         if apply and new_label != "":
                             selected_experiments.set_cycle_label(
-                                current_view, selected_series, new_label
+                                current_view, selected_series_to_edit, new_label
                             )
 
         # If there are selected experiment in the buffer start the plot operations
@@ -662,7 +663,7 @@ if enable:
                 # show_discharge = st.checkbox("Show discharge", value=True)
 
                 st.markdown("###### Aspect")
-                font_size = st.number_input("Label font size", min_value=4, value=14)
+                font_size = st.number_input("Label font size", min_value=4, value=14, key="font_size_comparison")
                 height = st.number_input(
                     "Plot height", min_value=10, max_value=1000, value=800, step=10
                 )
@@ -697,7 +698,6 @@ if enable:
                     x_axis, y_axis, None, height=height, font_size=font_size
                 )
                 st.plotly_chart(fig, use_container_width=True)
-
 
 # If there are no experiments in the buffer suggest to the user to load data form the main page
 else:
