@@ -99,18 +99,17 @@ with upload_tab:
             # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
             st.session_state["UploadConfirmation"][0] = new_experiment.name
 
+            skipped_files = []
             if new_experiment.manager.instrument == "GAMRY":
                 if len(new_experiment.manager.bytestreams) != len(
                     new_experiment.manager.halfcycles
                 ):
-                    skipped_files = []
                     for filename in new_experiment.manager.bytestreams.keys():
                         if filename not in new_experiment.manager.halfcycles.keys():
                             skipped_files.append(filename)
                     st.session_state["UploadConfirmation"][1] = skipped_files
 
             elif new_experiment.manager.instrument == "BIOLOGIC":
-                skipped_files = []
                 for filename in new_experiment.manager.bytestreams.keys():
                     find = False
                     for search in new_experiment.manager.halfcycles.keys():

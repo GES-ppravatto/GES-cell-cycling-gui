@@ -121,6 +121,8 @@ def generate_stacked_cycle_plot_figure(
             # Print the discharge halfcycle
             if cycle.discharge is not None and show_discharge is True:
 
+                series_name = selected_experiments.get_label(name, cycle_id)
+
                 x_series = get_halfcycle_series(cycle.discharge, x_axis)
                 y_series = get_halfcycle_series(cycle.discharge, y_axis)
 

@@ -481,7 +481,7 @@ class Experiment:
         """
         getter of the cycles with automatic call to parse
         """
-        self._manager.parse()
+        #self._manager.parse()
         return self._manager.get_cycles(self._ordering, self._clean)
 
 
