@@ -40,18 +40,16 @@ with upload_tab:
     # Define a two column section to select if the new data will create a new experiment or
     # if they must be added to an existing one.
 
-    col1, col2 = st.columns(2)
+    action = st.radio(
+        "Select action:",
+        ["Create new experiment", "Add to existing experiment"],
+        disabled=(
+            status.number_of_experiments == 0
+        ),  # Disable the selector if no other experiments are loaded
+    )
 
-    with col1:
-        action = st.radio(
-            "Select action:",
-            ["Create new experiment", "Add to existing experiment"],
-            disabled=(
-                status.number_of_experiments == 0
-            ),  # Disable the selector if no other experiments are loaded
-        )
-
-    with col2:
+    # Define an upload form where multiple files can be loaded indipendently
+    with st.form("File upload form", clear_on_submit=True):
 
         # If "Create new experiment" is selected ask the user to input the experiment name
         if action == "Create new experiment":
@@ -67,9 +65,6 @@ with upload_tab:
                 "Select the experiment to wich the files must be added:", experiment_names
             )
 
-    # Define an upload form where multiple files can be loaded indipendently
-    with st.form("File upload form", clear_on_submit=True):
-
         files = st.file_uploader(
             "Select the cell-cycling datafiles", accept_multiple_files=True
         )
@@ -79,57 +74,59 @@ with upload_tab:
         # If the button has been pressed and the file list is not empty load the files in the experiment
         if submitted and files != []:
 
-            # Define a new experiment object
-            new_experiment = Experiment(files)
+            with st.spinner(text="Wait while the files are uploaded"):
 
-            # Set the name selected by the user if existing
-            if name != "":
-                new_experiment.name = name
-            else:
-                name = new_experiment.name
+                # Define a new experiment object
+                new_experiment = Experiment(files)
 
-            # If the selected action is "Create new experiment" add the new experiment to the ProgramStatus
-            if action == "Create new experiment":
-                status.append_experiment(new_experiment)
+                # Set the name selected by the user if existing
+                if name != "":
+                    new_experiment.name = name
+                else:
+                    name = new_experiment.name
 
-            # If the selected action is "Add new experiment", add the object to the already available one
-            else:
-                status[status.get_index_of(name)] += new_experiment
+                # If the selected action is "Create new experiment" add the new experiment to the ProgramStatus
+                if action == "Create new experiment":
+                    status.append_experiment(new_experiment)
 
-            # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
-            st.session_state["UploadConfirmation"][0] = new_experiment.name
+                # If the selected action is "Add new experiment", add the object to the already available one
+                else:
+                    status[status.get_index_of(name)] += new_experiment
 
-            skipped_files = []
-            if new_experiment.manager.instrument == "GAMRY":
-                if len(new_experiment.manager.bytestreams) != len(
-                    new_experiment.manager.halfcycles
-                ):
+                # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
+                st.session_state["UploadConfirmation"][0] = new_experiment.name
+
+                skipped_files = []
+                if new_experiment.manager.instrument == "GAMRY":
+                    if len(new_experiment.manager.bytestreams) != len(
+                        new_experiment.manager.halfcycles
+                    ):
+                        for filename in new_experiment.manager.bytestreams.keys():
+                            if filename not in new_experiment.manager.halfcycles.keys():
+                                skipped_files.append(filename)
+                        st.session_state["UploadConfirmation"][1] = skipped_files
+
+                elif new_experiment.manager.instrument == "BIOLOGIC":
                     for filename in new_experiment.manager.bytestreams.keys():
-                        if filename not in new_experiment.manager.halfcycles.keys():
+                        find = False
+                        for search in new_experiment.manager.halfcycles.keys():
+                            if filename in search:
+                                find = True
+                                break
+
+                        if find is False:
                             skipped_files.append(filename)
-                    st.session_state["UploadConfirmation"][1] = skipped_files
+                    if skipped_files != []:
+                        st.session_state["UploadConfirmation"][1] = skipped_files
 
-            elif new_experiment.manager.instrument == "BIOLOGIC":
-                for filename in new_experiment.manager.bytestreams.keys():
-                    find = False
-                    for search in new_experiment.manager.halfcycles.keys():
-                        if filename in search:
-                            find = True
-                            break
+                else:
+                    raise RuntimeError
 
-                    if find is False:
-                        skipped_files.append(filename)
                 if skipped_files != []:
-                    st.session_state["UploadConfirmation"][1] = skipped_files
+                    status[status.get_index_of(name)]._skipped_files += len(skipped_files)
 
-            else:
-                raise RuntimeError
-
-            if skipped_files != []:
-                status[status.get_index_of(name)]._skipped_files += len(skipped_files)
-
-            # Rerun the page to force update
-            st.experimental_rerun()
+                # Rerun the page to force update
+                st.experimental_rerun()
 
     created_experiment = st.session_state["UploadConfirmation"][0]
     skipped_files = st.session_state["UploadConfirmation"][1]
