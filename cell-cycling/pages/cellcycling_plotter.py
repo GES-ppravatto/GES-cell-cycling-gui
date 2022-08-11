@@ -58,7 +58,7 @@ class ExperimentContainer:
     def hide_cycle(self, cumulative_id: int) -> None:
         cumulative_sum = []
         for i, number in enumerate(self.max_cycles_numbers):
-            cumulative_sum.append(number if i == 0 else cumulative_sum[-1] + number)
+            cumulative_sum.append(number if i == 0 else cumulative_sum[-1] + number + 1)
 
         experiment_id, cycle_id = None, None
         for i, threshold in enumerate(cumulative_sum):
@@ -67,7 +67,7 @@ class ExperimentContainer:
                 if i == 0:
                     cycle_id = cumulative_id
                 else:
-                    cycle_id = cumulative_id - cumulative_sum[i - 1]
+                    cycle_id = cumulative_id - cumulative_sum[i - 1] - 1
                 break
 
         self._experiments[experiment_id].hide_cycle(cycle_id)
@@ -406,8 +406,17 @@ if enable:
                     "Select secondary Y axis markers",
                     [m for m in MARKERS.keys() if m != primary_axis_marker],
                 )
+
+                options = []
+                if y_axis_mode == "Only primary":
+                    options = ["Primary", "None"]
+                elif y_axis_mode == "Only secondary":
+                    options = ["Secondary", "None"]
+                else:
+                    options = ["Primary", "Secondary", "None"]
+
                 which_grid = st.radio(
-                    "Y-axis grid selector", options=["Primary", "Secondary", "None"]
+                    "Y-axis grid selector", options=options
                 )
                 font_size = st.number_input(
                     "Label font size", min_value=4, value=14, key="font_size_comparison"
@@ -518,6 +527,10 @@ if enable:
                 )
 
                 figure_data = fig.full_figure_for_development(warn=False)
+
+                if selected_points != [] and selected_points is not None:
+                    selected_cycles = ", ".join([str(point["x"]) for point in selected_points])
+                    st.write(f"Currently selected points: {selected_cycles}")
 
                 with chide:
                     hide = st.button(
