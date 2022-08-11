@@ -58,22 +58,20 @@ class ExperimentContainer:
     def hide_cycle(self, cumulative_id: int) -> None:
         cumulative_sum = []
         for i, number in enumerate(self.max_cycles_numbers):
-            cumulative_sum.append(
-                number if i == 0 else cumulative_sum[-1] + number
-            )
-        
+            cumulative_sum.append(number if i == 0 else cumulative_sum[-1] + number)
+
         experiment_id, cycle_id = None, None
         for i, threshold in enumerate(cumulative_sum):
             if cumulative_id <= threshold:
                 experiment_id = i
-                if i==0:
+                if i == 0:
                     cycle_id = cumulative_id
                 else:
-                    cycle_id = cumulative_id - cumulative_sum[i-1]
+                    cycle_id = cumulative_id - cumulative_sum[i - 1]
                 break
 
         self._experiments[experiment_id].hide_cycle(cycle_id)
-                    
+
 
 MARKERS = {
     "●": "circle",
@@ -418,22 +416,20 @@ if enable:
                     "Plot height", min_value=10, max_value=2000, value=600, step=10
                 )
 
-
             with col1:
-                
+
                 # Create a figure object with the secondary y-axis option enabled
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
 
                 for container in available_containers:
 
+                    offset = 0
                     cellcycling: CellCycling = None
+
                     for cycling_index, (name, cellcycling) in enumerate(container):
 
-                        offset = (
-                            0
-                            if cycling_index == 0
-                            else container.max_cycles_numbers[cycling_index - 1] + 1
-                        )
+                        if cycling_index != 0:
+                            offset += container.max_cycles_numbers[cycling_index - 1] + 1
 
                         cycle_index = [n + offset for n in cellcycling.numbers]
 
@@ -471,7 +467,7 @@ if enable:
                             )
 
                 if annotation_dict != {}:
-                    
+
                     for text, position in annotation_dict.items():
                         fig.add_annotation(
                             x=position[0],
@@ -517,12 +513,19 @@ if enable:
                     plot_bgcolor="#FFFFFF",
                 )
 
-                selected_points = plotly_events(fig, click_event=False, select_event=True, override_height=height)
+                selected_points = plotly_events(
+                    fig, click_event=False, select_event=True, override_height=height
+                )
 
                 figure_data = fig.full_figure_for_development(warn=False)
 
                 with chide:
-                    hide = st.button("🚫 Hide cycles", disabled= False if selected_points != [] and selected_points is not None else True)
+                    hide = st.button(
+                        "🚫 Hide cycles",
+                        disabled=False
+                        if selected_points != [] and selected_points is not None
+                        else True,
+                    )
 
                     if hide:
                         trace_list = [obj["name"] for obj in figure_data["data"]]
@@ -535,9 +538,9 @@ if enable:
                             available_containers[container_idx].hide_cycle(
                                 selected_point["x"]
                             )
-                        
+
                         st.experimental_rerun()
-                
+
                 with crefresh:
                     refresh = st.button("♻ Refresh")
 
@@ -557,7 +560,6 @@ if enable:
                     plot_limits["y"] = yrange
                     st.experimental_rerun()
 
-
             with col2:
 
                 st.markdown("###### Export")
@@ -569,9 +571,9 @@ if enable:
                     "Plot width",
                     min_value=10,
                     max_value=4000,
-                    value= 1000,
+                    value=1000,
                 )
-                
+
                 fig.update_layout(
                     height=height,
                     width=width,
