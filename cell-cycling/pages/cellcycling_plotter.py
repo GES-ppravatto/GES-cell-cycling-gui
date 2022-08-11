@@ -2,6 +2,7 @@ from typing import Dict, List, Tuple, Union
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from streamlit_plotly_events import plotly_events
 
 from core.gui_core import Experiment, ProgramStatus, get_plotly_color
 
@@ -30,6 +31,14 @@ class ExperimentContainer:
     def hex_color(self) -> str:
         return self._color
 
+    @property
+    def max_cycles_numbers(self) -> List[int]:
+        numbers = []
+        for _, obj in self:
+            obj.get_numbers()
+            numbers.append(obj._numbers[-1])
+        return numbers
+
     def add_experiment(self, experiment: Experiment) -> None:
         if experiment not in self._experiments:
             self._experiments.append(experiment)
@@ -46,6 +55,25 @@ class ExperimentContainer:
     def clear_experiments(self) -> None:
         self._experiments = {}
 
+    def hide_cycle(self, cumulative_id: int) -> None:
+        cumulative_sum = []
+        for i, number in enumerate(self.max_cycles_numbers):
+            cumulative_sum.append(
+                number if i == 0 else cumulative_sum[-1] + number
+            )
+        
+        experiment_id, cycle_id = None, None
+        for i, threshold in enumerate(cumulative_sum):
+            if cumulative_id <= threshold:
+                experiment_id = i
+                if i==0:
+                    cycle_id = cumulative_id
+                else:
+                    cycle_id = cumulative_id - cumulative_sum[i-1]
+                break
+
+        self._experiments[experiment_id].hide_cycle(cycle_id)
+                    
 
 MARKERS = {
     "●": "circle",
@@ -97,6 +125,7 @@ else:
     if len(status) == 0:
         enable = False
 
+st.set_page_config(layout="wide")
 
 # Set the title of the page and print some generic instruction
 st.title("Cell-cycling plotter")
@@ -255,212 +284,315 @@ if enable:
 
     with plot_tab:
 
-        st.markdown("#### Cell-cycling plotter")
-        st.write(
-            """In this tab you can create a cell cycling plot and interactively selecting
-            its appearence"""
-        )
+        if available_containers != []:
 
-        if plot_limits["x"][0] != None:
+            st.markdown("#### Cell-cycling plotter")
+            st.write(
+                """In this tab you can create a cell cycling plot and interactively selecting
+                its appearence"""
+            )
 
-            with st.expander("Annotation editor", expanded=False):
-                st.markdown("###### Global annotation settings")
+            if plot_limits["x"][0] != None:
 
-                col1, col2 = st.columns(2)
+                with st.expander("Annotation editor", expanded=False):
+                    st.markdown("###### Global annotation settings")
 
-                with col1:
-                    annotation_size = st.number_input(
-                        "Enter the dimension of the annotation font", min_value=4, value=12
-                    )
+                    col1, col2 = st.columns(2)
 
-                with col2:
-                    annotation_color = st.color_picker(
-                        "Select annotation color", value="#000000"
-                    )
-
-                st.markdown("###### Edit annotation")
-
-                col1, col2, col3, col4 = st.columns(4)
-
-                with col1:
-                    mode = st.radio("Select operation", ["Add new", "Edit existing"])
-
-                with col2:
-                    if mode == "Add new":
-                        annotation = st.text_input("Enter the annotation content")
-                    else:
-                        annotation = st.selectbox(
-                            "Select annotation", [text for text in annotation_dict.keys()]
+                    with col1:
+                        annotation_size = st.number_input(
+                            "Enter the dimension of the annotation font",
+                            min_value=4,
+                            value=12,
                         )
 
-                with col3:
-                    x_position = st.slider(
-                        "X position",
-                        min_value=float(plot_limits["x"][0]),
-                        max_value=float(plot_limits["x"][1]),
-                        step=0.1,
-                    )
+                    with col2:
+                        annotation_color = st.color_picker(
+                            "Select annotation color", value="#000000"
+                        )
 
-                with col4:
-                    y_position = st.slider(
-                        "Y position",
-                        min_value=float(plot_limits["y"][0]),
-                        max_value=float(plot_limits["y"][1]),
-                        step=0.1,
-                    )
+                    st.markdown("###### Edit annotation")
 
-                col1, col2 = st.columns(2)
+                    col1, col2, col3, col4 = st.columns(4)
 
-                with col1:
+                    with col1:
+                        mode = st.radio("Select operation", ["Add new", "Edit existing"])
+
+                    with col2:
+                        if mode == "Add new":
+                            annotation = st.text_input("Enter the annotation content")
+                        else:
+                            annotation = st.selectbox(
+                                "Select annotation",
+                                [text for text in annotation_dict.keys()],
+                            )
+
+                    with col3:
+                        x_position = st.slider(
+                            "X position",
+                            min_value=float(plot_limits["x"][0]),
+                            max_value=float(plot_limits["x"][1]),
+                            step=0.1,
+                        )
+
+                    with col4:
+                        y_position = st.slider(
+                            "Y position",
+                            min_value=float(plot_limits["y"][0]),
+                            max_value=float(plot_limits["y"][1]),
+                            step=0.1,
+                        )
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        if mode == "Edit existing":
+                            remove = st.button(
+                                "❌ Remove annotation",
+                                key="annotation_remove",
+                                disabled=True if annotation is None else False,
+                            )
+                        pass
+
+                    with col2:
+                        if mode == "Add new":
+                            apply = st.button(
+                                "✅ Apply",
+                                key="annotation_apply",
+                                disabled=True if annotation == "" else False,
+                            )
+
                     if mode == "Edit existing":
-                        remove = st.button(
-                            "❌ Remove annotation",
-                            key="annotation_remove",
-                            disabled=True if annotation is None else False,
-                        )
-                    pass
+                        if remove:
+                            del annotation_dict[annotation]
+                            st.experimental_rerun()
 
-                with col2:
-                    if mode == "Add new":
-                        apply = st.button(
-                            "✅ Apply",
-                            key="annotation_apply",
-                            disabled=True if annotation == "" else False,
+                    if apply or mode == "Edit existing":
+                        if annotation is not None and annotation != "":
+                            annotation_dict[annotation] = [x_position, y_position]
+
+            chide, cunhide, crefresh = st.columns(3)
+
+            with cunhide:
+                unhide = st.button("👁 Unhide all")
+
+                if unhide:
+                    for container in available_containers:
+                        for experiment in container._experiments:
+                            experiment.unhide_all_cycles()
+
+            col1, col2 = st.columns([4, 1])
+
+            with col2:
+
+                st.markdown("###### Series selector")
+
+                primary_axis_name = st.selectbox(
+                    "Select the dataset for the primary Y axis", Y_OPTIONS
+                )
+                secondary_axis_name = st.selectbox(
+                    "Select the dataset for the secondary Y axis",
+                    [option for option in Y_OPTIONS if option != primary_axis_name],
+                )
+
+                y_axis_mode = st.radio(
+                    "Select which Y axis series to show",
+                    ["Both", "Only primary", "Only secondary"],
+                )
+
+                st.markdown("###### Graph options")
+                primary_axis_marker = st.selectbox(
+                    "Select primary Y axis markers", [m for m in MARKERS.keys()]
+                )
+                secondary_axis_marker = st.selectbox(
+                    "Select secondary Y axis markers",
+                    [m for m in MARKERS.keys() if m != primary_axis_marker],
+                )
+                which_grid = st.radio(
+                    "Y-axis grid selector", options=["Primary", "Secondary", "None"]
+                )
+                font_size = st.number_input(
+                    "Label font size", min_value=4, value=14, key="font_size_comparison"
+                )
+                height = st.number_input(
+                    "Plot height", min_value=10, max_value=2000, value=600, step=10
+                )
+
+
+            with col1:
+                
+                # Create a figure object with the secondary y-axis option enabled
+                fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+                for container in available_containers:
+
+                    cellcycling: CellCycling = None
+                    for cycling_index, (name, cellcycling) in enumerate(container):
+
+                        offset = (
+                            0
+                            if cycling_index == 0
+                            else container.max_cycles_numbers[cycling_index - 1] + 1
                         )
 
-                if mode == "Edit existing":
-                    if remove:
-                        del annotation_dict[annotation]
+                        cycle_index = [n + offset for n in cellcycling.numbers]
+
+                        primary_axis = get_data_series(primary_axis_name, cellcycling)
+                        secondary_axis = get_data_series(secondary_axis_name, cellcycling)
+
+                        primary_marker = MARKERS[primary_axis_marker]
+                        secondary_marker = MARKERS[secondary_axis_marker]
+
+                        if y_axis_mode != "Only secondary":
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=cycle_index,
+                                    y=primary_axis,
+                                    name=container.name,
+                                    mode="markers",
+                                    marker_symbol=primary_marker,
+                                    line=dict(color=container.hex_color),
+                                ),
+                                secondary_y=False,
+                            )
+
+                        if y_axis_mode != "Only primary":
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=cycle_index,
+                                    y=secondary_axis,
+                                    name=container.name,
+                                    mode="markers",
+                                    marker_symbol=secondary_marker,
+                                    line=dict(color=container.hex_color),
+                                    showlegend=False,
+                                ),
+                                secondary_y=True,
+                            )
+
+                if annotation_dict != {}:
+                    
+                    for text, position in annotation_dict.items():
+                        fig.add_annotation(
+                            x=position[0],
+                            y=position[1],
+                            text=text,
+                            font_size=annotation_size,
+                            font_color=annotation_color,
+                            showarrow=False,
+                        )
+
+                # Apply proper formatting to the x and y_a axis
+                fig.update_xaxes(
+                    title_text="Cycle number",
+                    showline=True,
+                    linecolor="black",
+                    gridwidth=1,
+                    gridcolor="#DDDDDD",
+                )
+                fig.update_yaxes(
+                    title_text=primary_axis_name,
+                    # color=primary_axis_color,
+                    secondary_y=False,
+                    showline=True,
+                    linecolor="black",
+                    gridwidth=1,
+                    gridcolor="#DDDDDD" if which_grid == "Primary" else None,
+                )
+                fig.update_yaxes(
+                    title_text=secondary_axis_name,
+                    # color=secondary_axis_color,
+                    secondary_y=True,
+                    showline=True,
+                    linecolor="black",
+                    gridwidth=1,
+                    gridcolor="#DDDDDD" if which_grid == "Secondary" else None,
+                )
+
+                # Apply proper formatting to legend and plot background
+                fig.update_layout(
+                    legend=dict(
+                        orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5
+                    ),
+                    plot_bgcolor="#FFFFFF",
+                )
+
+                selected_points = plotly_events(fig, click_event=False, select_event=True, override_height=height)
+
+                figure_data = fig.full_figure_for_development(warn=False)
+
+                with chide:
+                    hide = st.button("🚫 Hide cycles", disabled= False if selected_points != [] and selected_points is not None else True)
+
+                    if hide:
+                        trace_list = [obj["name"] for obj in figure_data["data"]]
+
+                        for selected_point in selected_points:
+                            container_name = trace_list[selected_point["curveNumber"]]
+                            container_id = [obj.name for obj in available_containers].index(
+                                container_name
+                            )
+                            available_containers[container_idx].hide_cycle(
+                                selected_point["x"]
+                            )
+                        
+                        st.experimental_rerun()
+                
+                with crefresh:
+                    refresh = st.button("♻ Refresh")
+
+                    if refresh:
                         st.experimental_rerun()
 
-                if apply or mode == "Edit existing":
-                    if annotation is not None and annotation != "":
-                        annotation_dict[annotation] = [x_position, y_position]
+                # st.plotly_chart(fig, use_container_width=True)
 
-        col1, col2 = st.columns([4, 1])
+                xrange = figure_data.layout.xaxis.range
+                yrange = figure_data.layout.yaxis.range
 
-        with col2:
+                if yrange is None:
+                    yrange = figure_data.layout.yaxis2.range
 
-            st.markdown("###### Series selector")
+                if plot_limits["x"] != xrange or plot_limits["y"] != yrange:
+                    plot_limits["x"] = xrange
+                    plot_limits["y"] = yrange
+                    st.experimental_rerun()
 
-            primary_axis_name = st.selectbox(
-                "Select the dataset for the primary Y axis", Y_OPTIONS
+
+            with col2:
+
+                st.markdown("###### Export")
+                format = st.selectbox(
+                    "Select the format of the file", ["png", "jpeg", "svg", "pdf"]
+                )
+
+                width = st.number_input(
+                    "Plot width",
+                    min_value=10,
+                    max_value=4000,
+                    value= 1000,
+                )
+                
+                fig.update_layout(
+                    height=height,
+                    width=width,
+                    font=dict(size=font_size),
+                    legend=dict(
+                        orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5
+                    ),
+                    plot_bgcolor="#FFFFFF",
+                )
+
+                st.download_button(
+                    "Download plot",
+                    data=fig.to_image(format=format),
+                    file_name=f"cycle_plot.{format}",
+                )
+
+        else:
+            st.info(
+                """**No container has been created yet** \n\n Please go to the container
+            editor tab and define at least one experiment container."""
             )
-            secondary_axis_name = st.selectbox(
-                "Select the dataset for the secondary Y axis",
-                [option for option in Y_OPTIONS if option != primary_axis_name],
-            )
-
-            st.markdown("###### Graph options")
-            primary_axis_marker = st.selectbox(
-                "Select primary Y axis markers", [m for m in MARKERS.keys()]
-            )
-            secondary_axis_marker = st.selectbox(
-                "Select secondary Y axis markers",
-                [m for m in MARKERS.keys() if m != primary_axis_marker],
-            )
-            which_grid = st.radio(
-                "Y-axis grid selector", options=["Primary", "Secondary", "None"]
-            )
-
-        with col1:
-
-            # Create a figure object with the secondary y-axis option enabled
-            fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-            for container in available_containers:
-
-                cellcycling: CellCycling = None
-                for name, cellcycling in container:
-
-                    cycle_index = cellcycling.get_numbers()
-
-                    primary_axis = get_data_series(primary_axis_name, cellcycling)
-                    secondary_axis = get_data_series(secondary_axis_name, cellcycling)
-
-                    primary_marker = MARKERS[primary_axis_marker]
-                    secondary_marker = MARKERS[secondary_axis_marker]
-
-                    fig.add_trace(
-                        go.Scatter(
-                            x=cycle_index,
-                            y=primary_axis,
-                            name=container.name,
-                            mode="markers",
-                            marker_symbol=primary_marker,
-                            line=dict(color=container.hex_color),
-                        ),
-                        secondary_y=False,
-                    )
-                    fig.add_trace(
-                        go.Scatter(
-                            x=cycle_index,
-                            y=secondary_axis,
-                            name=container.name,
-                            mode="markers",
-                            marker_symbol=secondary_marker,
-                            line=dict(color=container.hex_color),
-                            showlegend=False,
-                        ),
-                        secondary_y=True,
-                    )
-
-            if annotation_dict != {}:
-                print(annotation_dict)
-                for text, position in annotation_dict.items():
-                    fig.add_annotation(
-                        x=position[0],
-                        y=position[1],
-                        text=text,
-                        font_size=annotation_size,
-                        font_color=annotation_color,
-                        showarrow=False,
-                    )
-
-            # Apply proper formatting to the x and y_a axis
-            fig.update_xaxes(
-                title_text="Cycle number",
-                showline=True,
-                linecolor="black",
-                gridwidth=1,
-                gridcolor="#DDDDDD",
-            )
-            fig.update_yaxes(
-                title_text=primary_axis_name,
-                # color=primary_axis_color,
-                secondary_y=False,
-                showline=True,
-                linecolor="black",
-                gridwidth=1,
-                gridcolor="#DDDDDD" if which_grid == "Primary" else None,
-            )
-            fig.update_yaxes(
-                title_text=secondary_axis_name,
-                # color=secondary_axis_color,
-                secondary_y=True,
-                showline=True,
-                linecolor="black",
-                gridwidth=1,
-                gridcolor="#DDDDDD" if which_grid == "Secondary" else None,
-            )
-
-            # Apply proper formatting to legend and plot background
-            fig.update_layout(
-                legend=dict(
-                    orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5
-                ),
-                plot_bgcolor="#FFFFFF",
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
-
-            xrange = fig.full_figure_for_development().layout.xaxis.range
-            yrange = fig.full_figure_for_development().layout.yaxis.range
-
-            if plot_limits["x"] != xrange or plot_limits["y"] != yrange:
-                plot_limits["x"] = xrange
-                plot_limits["y"] = yrange
-                st.experimental_rerun()
 
 
 # If there are no experiments in the buffer suggest to the user to load data form the main page

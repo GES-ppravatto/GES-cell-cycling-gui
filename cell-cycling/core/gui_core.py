@@ -307,6 +307,7 @@ class Experiment:
 
         # Set the clean flag of the file manager to false
         self._clean = False
+        self._manual_hide = []
 
         # Create a buffer for the cycle based objects
         self._cycles = None
@@ -329,8 +330,9 @@ class Experiment:
         self._skipped_files = 0
 
     def _update_cycles_based_objects(self) -> None:
-        self._cycles = self._manager.get_cycles(self._ordering, self._clean)
-        self._cellcycling = self._manager.get_cellcycling(self._ordering, self._clean)
+        self._cycles = self._manager.get_cycles(self._ordering, self._clean)            
+        self._cellcycling = CellCycling(self._cycles)
+        self._cellcycling.hide(self._manual_hide)
 
     def __iadd__(self, source: Experiment):
         """
@@ -391,6 +393,14 @@ class Experiment:
         if autoparse:
             self._manager.parse()
             self._update_cycles_based_objects()
+
+    def hide_cycle(self, index: int) -> None:
+        self._manual_hide.append(index)
+        self._update_cycles_based_objects()
+    
+    def unhide_all_cycles(self) -> None:
+        self._manual_hide = []
+        self._update_cycles_based_objects()
 
     @property
     def name(self) -> str:

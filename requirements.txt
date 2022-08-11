@@ -3,3 +3,4 @@ plotly
 palettable
 streamlit
 kaleido
+streamlit-plotly-events
