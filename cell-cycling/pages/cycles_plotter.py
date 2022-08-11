@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 import math
 import streamlit as st
 import numpy as np
@@ -28,7 +28,9 @@ HALFCYCLE_SERIES = [
 ]
 
 
-def get_halfcycle_series(halfcycle: HalfCycle, title: str) -> pd.Series:
+def get_halfcycle_series(
+    halfcycle: HalfCycle, title: str, volume: Union[None, float]
+) -> pd.Series:
     """
     Given the halfcycle of interest and the title of the data series, retuns the pandas
     Serier containing the data to plot
@@ -46,11 +48,11 @@ def get_halfcycle_series(halfcycle: HalfCycle, title: str) -> pd.Series:
     elif title == "voltage (V)":
         return halfcycle.voltage
     elif title == "current (A)":
-        return halfcycle.current
+        return halfcycle.current / volume if volume is not None else halfcycle.current
     elif title == "charge (mAh)":
-        return halfcycle.Q
+        return halfcycle.Q / volume if volume is not None else halfcycle.Q
     elif title == "energy (mWh)":
-        return halfcycle.energy
+        return halfcycle.energy / volume if volume is not None else halfcycle.energy
     else:
         raise ValueError
 
@@ -65,6 +67,7 @@ def generate_stacked_cycle_plot_figure(
     plot_height: int = 400,
     shared_x: bool = False,
     font_size: int = 14,
+    scale_by_volume: bool = False,
 ):
 
     status: ProgramStatus = st.session_state["ProgramStatus"]
@@ -85,6 +88,7 @@ def generate_stacked_cycle_plot_figure(
         id = status.get_index_of(name)
         experiment: Experiment = status[id]
         cycles = experiment.cycles
+        volume = experiment.volume
 
         # Get the user selected cycles and plot only the corresponden lines
         num_traces = len(selected_experiments[name])
@@ -103,8 +107,12 @@ def generate_stacked_cycle_plot_figure(
 
                 series_name = selected_experiments.get_label(name, cycle_id)
 
-                x_series = get_halfcycle_series(cycle.charge, x_axis)
-                y_series = get_halfcycle_series(cycle.charge, y_axis)
+                x_series = get_halfcycle_series(
+                    cycle.charge, x_axis, volume if scale_by_volume else None
+                )
+                y_series = get_halfcycle_series(
+                    cycle.charge, y_axis, volume if scale_by_volume else None
+                )
 
                 fig.add_trace(
                     go.Scatter(
@@ -122,8 +130,12 @@ def generate_stacked_cycle_plot_figure(
 
                 series_name = selected_experiments.get_label(name, cycle_id)
 
-                x_series = get_halfcycle_series(cycle.discharge, x_axis)
-                y_series = get_halfcycle_series(cycle.discharge, y_axis)
+                x_series = get_halfcycle_series(
+                    cycle.discharge, x_axis, volume if scale_by_volume else None
+                )
+                y_series = get_halfcycle_series(
+                    cycle.discharge, y_axis, volume if scale_by_volume else None
+                )
 
                 fig.add_trace(
                     go.Scatter(
@@ -170,7 +182,12 @@ def generate_stacked_cycle_plot_figure(
 
 
 def generate_comparison_cycle_plot_figure(
-    x_axis: str, y_axis: str, width: int = 800, height: int = 400, font_size: int = 14
+    x_axis: str,
+    y_axis: str,
+    width: int = 800,
+    height: int = 400,
+    font_size: int = 14,
+    scale_by_volume: bool = False,
 ):
 
     status: ProgramStatus = st.session_state["ProgramStatus"]
@@ -190,12 +207,17 @@ def generate_comparison_cycle_plot_figure(
 
         label = entry.label
         color = entry.hex_color
+        volume = status[exp_idx].volume
 
         # Print the charge halfcycle
         if cycle.charge is not None:
 
-            x_series = get_halfcycle_series(cycle.charge, x_axis)
-            y_series = get_halfcycle_series(cycle.charge, y_axis)
+            x_series = get_halfcycle_series(
+                cycle.charge, x_axis, volume if scale_by_volume else None
+            )
+            y_series = get_halfcycle_series(
+                cycle.charge, y_axis, volume if scale_by_volume else None
+            )
 
             fig.add_trace(
                 go.Scatter(
@@ -211,8 +233,12 @@ def generate_comparison_cycle_plot_figure(
         # Print the discharge halfcycle
         if cycle.discharge is not None:
 
-            x_series = get_halfcycle_series(cycle.discharge, x_axis)
-            y_series = get_halfcycle_series(cycle.discharge, y_axis)
+            x_series = get_halfcycle_series(
+                cycle.discharge, x_axis, volume if scale_by_volume else None
+            )
+            y_series = get_halfcycle_series(
+                cycle.discharge, y_axis, volume if scale_by_volume else None
+            )
 
             fig.add_trace(
                 go.Scatter(
@@ -512,6 +538,18 @@ if enable:
                 show_charge = st.checkbox("Show charge", value=True)
                 show_discharge = st.checkbox("Show discharge", value=True)
 
+                volume_is_available = True
+                for name in selected_experiments.view.keys():
+                    experiment_id = status.get_index_of(name)
+                    experiment = status[experiment_id]
+                    if experiment.volume is None:
+                        volume_is_available = False
+                        break
+
+                scale_by_volume = st.checkbox(
+                    "Scale values by volume", value=False, disabled=not volume_is_available
+                )
+
                 st.markdown("###### Aspect")
                 reverse = st.checkbox("Reversed colorscale", value=True)
                 font_size = st.number_input("Label font size", min_value=4, value=14)
@@ -539,6 +577,7 @@ if enable:
                     plot_height=plot_height,
                     shared_x=shared_x,
                     font_size=font_size,
+                    scale_by_volume=scale_by_volume,
                 )
 
                 st.download_button(
@@ -557,6 +596,7 @@ if enable:
                     plot_height=plot_height,
                     shared_x=shared_x,
                     font_size=font_size,
+                    scale_by_volume=scale_by_volume,
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -660,6 +700,18 @@ if enable:
                     key="y_comparison",
                 )
 
+                volume_is_available = True
+                for series in selected_series:
+                    experiment_id = status.get_index_of(series.experiment_name)
+                    experiment = status[experiment_id]
+                    if experiment.volume is None:
+                        volume_is_available = False
+                        break
+
+                scale_by_volume = st.checkbox(
+                    "Scale values by volume", value=False, disabled=not volume_is_available
+                )
+
                 # st.markdown("###### Series")
                 # show_charge = st.checkbox("Show charge", value=True)
                 # show_discharge = st.checkbox("Show discharge", value=True)
@@ -688,7 +740,12 @@ if enable:
                 )
 
                 export_fig = generate_comparison_cycle_plot_figure(
-                    x_axis, y_axis, width=width, height=height, font_size=font_size
+                    x_axis,
+                    y_axis,
+                    width=width,
+                    height=height,
+                    font_size=font_size,
+                    scale_by_volume=scale_by_volume,
                 )
 
                 st.download_button(
@@ -701,7 +758,12 @@ if enable:
 
                 # Insert the plot in streamlit
                 fig = generate_comparison_cycle_plot_figure(
-                    x_axis, y_axis, None, height=height, font_size=font_size
+                    x_axis,
+                    y_axis,
+                    None,
+                    height=height,
+                    font_size=font_size,
+                    scale_by_volume=scale_by_volume,
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
