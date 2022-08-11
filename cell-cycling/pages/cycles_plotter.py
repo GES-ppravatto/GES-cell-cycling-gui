@@ -12,7 +12,7 @@ from core.gui_core import (
     ExperimentSelector,
     SingleCycleSeries,
     RGB_to_HEX,
-    get_plotly_color
+    get_plotly_color,
 )
 from echemsuite.cellcycling.cycles import HalfCycle
 
@@ -167,6 +167,7 @@ def generate_stacked_cycle_plot_figure(
 
 
 # %% Define function to generate the comparison-plot cycles figure and palette
+
 
 def generate_comparison_cycle_plot_figure(
     x_axis: str, y_axis: str, width: int = 800, height: int = 400, font_size: int = 14
@@ -387,7 +388,10 @@ if enable:
 
                         # Show a number input to allow the selection of the start point
                         start = st.number_input(
-                            "Start", min_value=0, max_value=max_cycle - 1, step=1,
+                            "Start",
+                            min_value=0,
+                            max_value=max_cycle - 1,
+                            step=1,
                         )
                         start = int(start)
 
@@ -647,10 +651,13 @@ if enable:
                 st.markdown("#### Plot options")
 
                 st.markdown("###### Axis")
-                x_axis = st.selectbox("Select the series x axis", HALFCYCLE_SERIES, key="x_comparison")
+                x_axis = st.selectbox(
+                    "Select the series x axis", HALFCYCLE_SERIES, key="x_comparison"
+                )
                 y_axis = st.selectbox(
                     "Select the series y axis",
-                    [element for element in HALFCYCLE_SERIES if element != x_axis], key="y_comparison"
+                    [element for element in HALFCYCLE_SERIES if element != x_axis],
+                    key="y_comparison",
                 )
 
                 # st.markdown("###### Series")
@@ -658,17 +665,21 @@ if enable:
                 # show_discharge = st.checkbox("Show discharge", value=True)
 
                 st.markdown("###### Aspect")
-                font_size = st.number_input("Label font size", min_value=4, value=14, key="font_size_comparison")
+                font_size = st.number_input(
+                    "Label font size", min_value=4, value=14, key="font_size_comparison"
+                )
                 height = st.number_input(
                     "Plot height", min_value=10, max_value=1000, value=800, step=10
                 )
 
                 st.markdown("###### Export")
                 format = st.selectbox(
-                    "Select the format of the file", ["png", "jpeg", "svg", "pdf"], key="format_comparison"
+                    "Select the format of the file",
+                    ["png", "jpeg", "svg", "pdf"],
+                    key="format_comparison",
                 )
 
-                suggested_width = int(2. * height)
+                suggested_width = int(2.0 * height)
                 width = st.number_input(
                     "Plot width",
                     min_value=10,

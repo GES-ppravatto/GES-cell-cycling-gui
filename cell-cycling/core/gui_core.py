@@ -171,6 +171,7 @@ def get_plotly_color(index: int) -> str:
     color_list = plotly.colors.qualitative.Plotly
     return color_list[index % len(color_list)]
 
+
 # %% Define custom exceptions
 class MultipleExtensions(Exception):
     """
@@ -326,7 +327,7 @@ class Experiment:
         # Set other class values
         self._volume = None  # Volume of the electrolite in liters
         self._skipped_files = 0
-    
+
     def _update_cycles_based_objects(self) -> None:
         self._cycles = self._manager.get_cycles(self._ordering, self._clean)
         self._cellcycling = self._manager.get_cellcycling(self._ordering, self._clean)
@@ -501,7 +502,7 @@ class Experiment:
         getter of the cycles list
         """
         return self._cycles
-    
+
     @property
     def cellcycling(self) -> CellCycling:
         """
@@ -637,7 +638,7 @@ class CycleFormat:
             self.label = label
         else:
             self.set_default_label()
-    
+
     def set_default_label(self) -> None:
         self.label = f"Cycle {self.number}"
 
@@ -731,7 +732,7 @@ class ExperimentSelector:
 
         # If no labels are provided generate a default set
         else:
-            
+
             # If the view already exist generate only the missing labels
             if name in self.view:
                 current_cycles = [obj.number for obj in self.view[name]]
@@ -745,11 +746,10 @@ class ExperimentSelector:
                     else:
                         updated_view.append(CycleFormat(idx))
                 self.view[name] = updated_view
-            
+
             # Else create a new default view labelling
             else:
                 self.view[name] = [CycleFormat(idx) for idx in cycles]
-
 
     def remove(self, name: str):
         """
@@ -787,10 +787,10 @@ class ExperimentSelector:
 
         if index not in [obj.number for obj in self.view[name]]:
             raise ValueError
-        
+
         idx = self[name].index(index)
         self.view[name][idx].label = label
-    
+
     def reset_default_labels(self, name: str) -> None:
         """
         Sets all the cycles lable of an experiment to the default format.
@@ -802,10 +802,10 @@ class ExperimentSelector:
         """
         if name not in self.view.keys():
             raise ValueError
-        
+
         for obj in self.view[name]:
             obj.set_default_label()
-    
+
     def get_labels(self, name: str) -> None:
         """
         Gets the list of labels associated to the selected cycles in the experiment
@@ -819,7 +819,7 @@ class ExperimentSelector:
             raise ValueError
 
         return [obj.label for obj in self.view[name]]
-    
+
     def get_label(self, name: str, index: int) -> str:
         """
         Gets the label associated to the selected cycle
@@ -830,7 +830,7 @@ class ExperimentSelector:
                 name of the experiment to which the cycle belongs to
             index : int
                 number of the cycle in the corresponding experiment
-        
+
         Returns
         -------
             str
@@ -839,11 +839,9 @@ class ExperimentSelector:
 
         if name not in self.view:
             raise ValueError
-        
+
         idx = self[name].index(index)
         return self.view[name][idx].label
-
-
 
     @property
     def names(self) -> List[str]:
@@ -862,9 +860,10 @@ class ExperimentSelector:
 
 # %% Define dataclass to store a general plot series attriburtes for cycle comparison plot
 
+
 @dataclass
 class SingleCycleSeries:
-    label : str
-    experiment_name : str
-    cycle_id : int
-    hex_color : str = None
+    label: str
+    experiment_name: str
+    cycle_id: int
+    hex_color: str = None
