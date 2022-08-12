@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Tuple, Union
 import math
 import streamlit as st
 import numpy as np
@@ -30,7 +30,7 @@ HALFCYCLE_SERIES = [
 
 def get_halfcycle_series(
     halfcycle: HalfCycle, title: str, volume: Union[None, float]
-) -> pd.Series:
+) -> Tuple[str, pd.Series]:
     """
     Given the halfcycle of interest and the title of the data series, retuns the pandas
     Serier containing the data to plot
@@ -44,241 +44,23 @@ def get_halfcycle_series(
             must match one of the entries of the HALFCYCLE_SERIES list variable.
     """
     if title == "time (s)":
-        return halfcycle.time
+        return "time (s)", halfcycle.time
     elif title == "voltage (V)":
-        return halfcycle.voltage
+        return "voltage (V)", halfcycle.voltage
     elif title == "current (A)":
-        return halfcycle.current / volume if volume is not None else halfcycle.current
+        return "current (A)", halfcycle.current
     elif title == "charge (mAh)":
-        return halfcycle.Q / volume if volume is not None else halfcycle.Q
+        if volume is not None:
+            return "charge per unit volume (mAh/L)", halfcycle.Q / volume  
+        else:
+            return "charge (mAh)", halfcycle.Q
     elif title == "energy (mWh)":
-        return halfcycle.energy / volume if volume is not None else halfcycle.energy
+        if volume is not None:
+            return "energy per unit volume (mWh/L)", halfcycle.energy / volume  
+        else:
+            return "energy (mWh)", halfcycle.energy
     else:
         raise ValueError
-
-
-# %% Define function to generate the stacked-plot cycles figure
-
-
-def generate_stacked_cycle_plot_figure(
-    x_axis: str,
-    y_axis: str,
-    width: int = 800,
-    plot_height: int = 400,
-    shared_x: bool = False,
-    font_size: int = 14,
-    scale_by_volume: bool = False,
-):
-
-    status: ProgramStatus = st.session_state["ProgramStatus"]
-    selected_experiments: ExperimentSelector = st.session_state["CyclePlotSelection"]
-
-    # Create a figure with a number of subplots equal to the numebr of selected experiments
-    fig = make_subplots(
-        cols=1,
-        rows=len(selected_experiments),
-        shared_xaxes=shared_x,
-        vertical_spacing=0.01 if shared_x else None,
-    )
-
-    # For eache experiment update the correspondent subplot
-    for index, name in enumerate(selected_experiments.names):
-
-        # Get the cycle list from the experiment
-        id = status.get_index_of(name)
-        experiment: Experiment = status[id]
-        cycles = experiment.cycles
-        volume = experiment.volume
-
-        # Get the user selected cycles and plot only the corresponden lines
-        num_traces = len(selected_experiments[name])
-        for trace_id, cycle_id in enumerate(selected_experiments[name]):
-
-            # Get the shade associated to the current trace
-            shade = RGB_to_HEX(
-                *experiment.color.get_shade(trace_id, num_traces, reversed=reverse)
-            )
-
-            # extract the cycle given the id selected
-            cycle = cycles[cycle_id]
-
-            # Print the charge halfcycle
-            if cycle.charge is not None and show_charge is True:
-
-                series_name = selected_experiments.get_label(name, cycle_id)
-
-                x_series = get_halfcycle_series(
-                    cycle.charge, x_axis, volume if scale_by_volume else None
-                )
-                y_series = get_halfcycle_series(
-                    cycle.charge, y_axis, volume if scale_by_volume else None
-                )
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=x_series,
-                        y=y_series,
-                        line=dict(color=shade),
-                        name=series_name,
-                    ),
-                    row=index + 1,
-                    col=1,
-                )
-
-            # Print the discharge halfcycle
-            if cycle.discharge is not None and show_discharge is True:
-
-                series_name = selected_experiments.get_label(name, cycle_id)
-
-                x_series = get_halfcycle_series(
-                    cycle.discharge, x_axis, volume if scale_by_volume else None
-                )
-                y_series = get_halfcycle_series(
-                    cycle.discharge, y_axis, volume if scale_by_volume else None
-                )
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=x_series,
-                        y=y_series,
-                        line=dict(color=shade),
-                        name=series_name,
-                        showlegend=False if cycle.charge else True,
-                    ),
-                    row=index + 1,
-                    col=1,
-                )
-
-    # Update the settings of the x-axis
-    fig.update_xaxes(
-        title_text=x_axis,
-        showline=True,
-        linecolor="black",
-        gridwidth=1,
-        gridcolor="#DDDDDD",
-    )
-
-    # Update the settings of the y-axis
-    fig.update_yaxes(
-        title_text=y_axis,
-        showline=True,
-        linecolor="black",
-        gridwidth=1,
-        gridcolor="#DDDDDD",
-    )
-
-    # Update the settings of plot layout
-    fig.update_layout(
-        plot_bgcolor="#FFFFFF",
-        height=plot_height * len(selected_experiments.names),
-        width=width,
-        font=dict(size=font_size),
-    )
-
-    return fig
-
-
-# %% Define function to generate the comparison-plot cycles figure and palette
-
-
-def generate_comparison_cycle_plot_figure(
-    x_axis: str,
-    y_axis: str,
-    width: int = 800,
-    height: int = 400,
-    font_size: int = 14,
-    scale_by_volume: bool = False,
-):
-
-    status: ProgramStatus = st.session_state["ProgramStatus"]
-    selected_series: List[SingleCycleSeries] = st.session_state["ComparisonPlot"]
-
-    # Create a figure with a number of subplots equal to the numebr of selected experiments
-    fig = make_subplots(cols=1, rows=1)
-
-    # For eache experiment update the correspondent subplot
-    for entry in selected_series:
-
-        name = entry.experiment_name
-        cycle_id = entry.cycle_id
-
-        exp_idx = status.get_index_of(name)
-        cycle = status[exp_idx].cycles[cycle_id]
-
-        label = entry.label
-        color = entry.hex_color
-        volume = status[exp_idx].volume
-
-        # Print the charge halfcycle
-        if cycle.charge is not None:
-
-            x_series = get_halfcycle_series(
-                cycle.charge, x_axis, volume if scale_by_volume else None
-            )
-            y_series = get_halfcycle_series(
-                cycle.charge, y_axis, volume if scale_by_volume else None
-            )
-
-            fig.add_trace(
-                go.Scatter(
-                    x=x_series,
-                    y=y_series,
-                    line=dict(color=color),
-                    name=label,
-                ),
-                row=1,
-                col=1,
-            )
-
-        # Print the discharge halfcycle
-        if cycle.discharge is not None:
-
-            x_series = get_halfcycle_series(
-                cycle.discharge, x_axis, volume if scale_by_volume else None
-            )
-            y_series = get_halfcycle_series(
-                cycle.discharge, y_axis, volume if scale_by_volume else None
-            )
-
-            fig.add_trace(
-                go.Scatter(
-                    x=x_series,
-                    y=y_series,
-                    line=dict(color=color),
-                    name=label,
-                    showlegend=False if cycle.charge else True,
-                ),
-                row=1,
-                col=1,
-            )
-
-    # Update the settings of the x-axis
-    fig.update_xaxes(
-        title_text=x_axis,
-        showline=True,
-        linecolor="black",
-        gridwidth=1,
-        gridcolor="#DDDDDD",
-    )
-
-    # Update the settings of the y-axis
-    fig.update_yaxes(
-        title_text=y_axis,
-        showline=True,
-        linecolor="black",
-        gridwidth=1,
-        gridcolor="#DDDDDD",
-    )
-
-    # Update the settings of plot layout
-    fig.update_layout(
-        plot_bgcolor="#FFFFFF",
-        height=height,
-        width=width,
-        font=dict(size=font_size),
-    )
-
-    return fig
 
 
 # %% Definition of the page GUI
@@ -557,6 +339,112 @@ if enable:
                     "Subplot height", min_value=10, max_value=1000, value=500, step=10
                 )
 
+            with col1:
+
+                # Create a figure with a number of subplots equal to the numebr of selected experiments
+                fig = make_subplots(
+                    cols=1,
+                    rows=len(selected_experiments),
+                    shared_xaxes=shared_x,
+                    vertical_spacing=0.01 if shared_x else None,
+                )
+
+                # For eache experiment update the correspondent subplot
+                for index, name in enumerate(selected_experiments.names):
+
+                    # Get the cycle list from the experiment
+                    exp_id = status.get_index_of(name)
+                    experiment: Experiment = status[exp_id]
+                    cycles = experiment.cycles
+                    volume = experiment.volume if scale_by_volume else None
+
+                    # Get the user selected cycles and plot only the corresponden lines
+                    num_traces = len(selected_experiments[name])
+                    for trace_id, cycle_id in enumerate(selected_experiments[name]):
+
+                        # Get the shade associated to the current trace
+                        shade = RGB_to_HEX(
+                            *experiment.color.get_shade(
+                                trace_id, num_traces, reversed=reverse
+                            )
+                        )
+
+                        # extract the cycle given the id selected
+                        cycle = cycles[cycle_id]
+
+                        # Print the charge halfcycle
+                        if cycle.charge is not None and show_charge is True:
+
+                            series_name = selected_experiments.get_label(name, cycle_id)
+
+                            x_label, x_series = get_halfcycle_series(cycle.charge, x_axis, volume)
+                            y_label, y_series = get_halfcycle_series(cycle.charge, y_axis, volume)
+
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=x_series,
+                                    y=y_series,
+                                    line=dict(color=shade),
+                                    name=series_name,
+                                ),
+                                row=index + 1,
+                                col=1,
+                            )
+
+                        # Print the discharge halfcycle
+                        if cycle.discharge is not None and show_discharge is True:
+
+                            series_name = selected_experiments.get_label(name, cycle_id)
+
+                            x_label, x_series = get_halfcycle_series(
+                                cycle.discharge, x_axis, volume
+                            )
+                            y_label, y_series = get_halfcycle_series(
+                                cycle.discharge, y_axis, volume
+                            )
+
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=x_series,
+                                    y=y_series,
+                                    line=dict(color=shade),
+                                    name=series_name,
+                                    showlegend=False if cycle.charge else True,
+                                ),
+                                row=index + 1,
+                                col=1,
+                            )
+
+                # Update the settings of the x-axis
+                fig.update_xaxes(
+                    title_text=x_label,
+                    showline=True,
+                    linecolor="black",
+                    gridwidth=1,
+                    gridcolor="#DDDDDD",
+                )
+
+                # Update the settings of the y-axis
+                fig.update_yaxes(
+                    title_text=y_label,
+                    showline=True,
+                    linecolor="black",
+                    gridwidth=1,
+                    gridcolor="#DDDDDD",
+                )
+
+                # Update the settings of plot layout
+                fig.update_layout(
+                    plot_bgcolor="#FFFFFF",
+                    height=plot_height * len(selected_experiments.names),
+                    width=None,
+                    font=dict(size=font_size),
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+            with col2:
+
                 st.markdown("###### Export")
                 format = st.selectbox(
                     "Select the format of the file", ["png", "jpeg", "svg", "pdf"]
@@ -570,35 +458,18 @@ if enable:
                     value=suggested_width if suggested_width <= 2000 else 2000,
                 )
 
-                export_fig = generate_stacked_cycle_plot_figure(
-                    x_axis,
-                    y_axis,
+                fig.update_layout(
+                    plot_bgcolor="#FFFFFF",
+                    height=plot_height * len(selected_experiments.names),
                     width=total_width,
-                    plot_height=plot_height,
-                    shared_x=shared_x,
-                    font_size=font_size,
-                    scale_by_volume=scale_by_volume,
+                    font=dict(size=font_size),
                 )
 
                 st.download_button(
                     "Download plot",
-                    data=export_fig.to_image(format=format),
+                    data=fig.to_image(format=format),
                     file_name=f"cycle_plot.{format}",
                 )
-
-            with col1:
-
-                # Insert the plot in streamlit
-                fig = generate_stacked_cycle_plot_figure(
-                    x_axis,
-                    y_axis,
-                    None,
-                    plot_height=plot_height,
-                    shared_x=shared_x,
-                    font_size=font_size,
-                    scale_by_volume=scale_by_volume,
-                )
-                st.plotly_chart(fig, use_container_width=True)
 
     with comparison_plot:
 
@@ -678,7 +549,7 @@ if enable:
                         "Select the series color", value=current_series.hex_color
                     )
 
-                    apply = st.button("✅ Apply")
+                    apply = st.button("✅ Apply", key="Apply_coparison_plot")
                     if apply:
                         current_series.label = new_label
                         current_series.hex_color = new_color
@@ -709,7 +580,10 @@ if enable:
                         break
 
                 scale_by_volume = st.checkbox(
-                    "Scale values by volume", value=False, disabled=not volume_is_available
+                    "Scale values by volume",
+                    value=False,
+                    disabled=not volume_is_available,
+                    key="comparison_plot",
                 )
 
                 # st.markdown("###### Series")
@@ -723,6 +597,89 @@ if enable:
                 height = st.number_input(
                     "Plot height", min_value=10, max_value=1000, value=800, step=10
                 )
+
+            with col1:
+
+                # Create a figure with a number of subplots equal to the numebr of selected experiments
+                fig = make_subplots(cols=1, rows=1)
+
+                # For eache experiment update the correspondent subplot
+                for entry in selected_series:
+
+                    name = entry.experiment_name
+                    cycle_id = entry.cycle_id
+
+                    exp_idx = status.get_index_of(name)
+                    cycle = status[exp_idx].cycles[cycle_id]
+
+                    label = entry.label
+                    color = entry.hex_color
+                    volume = status[exp_idx].volume if scale_by_volume else None
+
+                    # Print the charge halfcycle
+                    if cycle.charge is not None:
+
+                        x_label, x_series = get_halfcycle_series(cycle.charge, x_axis, volume)
+                        y_label, y_series = get_halfcycle_series(cycle.charge, y_axis, volume)
+
+                        fig.add_trace(
+                            go.Scatter(
+                                x=x_series,
+                                y=y_series,
+                                line=dict(color=color),
+                                name=label,
+                            ),
+                            row=1,
+                            col=1,
+                        )
+
+                    # Print the discharge halfcycle
+                    if cycle.discharge is not None:
+
+                        x_label, x_series = get_halfcycle_series(cycle.discharge, x_axis, volume)
+                        y_label, y_series = get_halfcycle_series(cycle.discharge, y_axis, volume)
+
+                        fig.add_trace(
+                            go.Scatter(
+                                x=x_series,
+                                y=y_series,
+                                line=dict(color=color),
+                                name=label,
+                                showlegend=False if cycle.charge else True,
+                            ),
+                            row=1,
+                            col=1,
+                        )
+
+                # Update the settings of the x-axis
+                fig.update_xaxes(
+                    title_text=x_label,
+                    showline=True,
+                    linecolor="black",
+                    gridwidth=1,
+                    gridcolor="#DDDDDD",
+                )
+
+                # Update the settings of the y-axis
+                fig.update_yaxes(
+                    title_text=y_label,
+                    showline=True,
+                    linecolor="black",
+                    gridwidth=1,
+                    gridcolor="#DDDDDD",
+                )
+
+                # Update the settings of plot layout
+                fig.update_layout(
+                    plot_bgcolor="#FFFFFF",
+                    height=height,
+                    width=None,
+                    font=dict(size=font_size),
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+            with col2:
 
                 st.markdown("###### Export")
                 format = st.selectbox(
@@ -739,33 +696,19 @@ if enable:
                     value=suggested_width if suggested_width <= 2000 else 2000,
                 )
 
-                export_fig = generate_comparison_cycle_plot_figure(
-                    x_axis,
-                    y_axis,
-                    width=width,
+                # Update the settings of plot layout
+                fig.update_layout(
+                    plot_bgcolor="#FFFFFF",
                     height=height,
-                    font_size=font_size,
-                    scale_by_volume=scale_by_volume,
+                    width=width,
+                    font=dict(size=font_size),
                 )
 
                 st.download_button(
                     "Download plot",
-                    data=export_fig.to_image(format=format),
+                    data=fig.to_image(format=format),
                     file_name=f"cycle_comparison_plot.{format}",
                 )
-
-            with col1:
-
-                # Insert the plot in streamlit
-                fig = generate_comparison_cycle_plot_figure(
-                    x_axis,
-                    y_axis,
-                    None,
-                    height=height,
-                    font_size=font_size,
-                    scale_by_volume=scale_by_volume,
-                )
-                st.plotly_chart(fig, use_container_width=True)
 
 # If there are no experiments in the buffer suggest to the user to load data form the main page
 else:
