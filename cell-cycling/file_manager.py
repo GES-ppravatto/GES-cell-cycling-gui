@@ -402,7 +402,7 @@ with manipulation_tab:
                 missing = []
                 for index, dictionary in enumerate(cycle_based_buffer):
                     if dictionary == {}:
-                        missing.append(index)
+                        missing.append(str(index))
 
                 # If there are missing levels print a warning to the user
                 if missing != []:
