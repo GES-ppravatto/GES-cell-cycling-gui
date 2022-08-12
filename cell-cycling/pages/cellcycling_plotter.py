@@ -415,9 +415,7 @@ if enable:
                 else:
                     options = ["Primary", "Secondary", "None"]
 
-                which_grid = st.radio(
-                    "Y-axis grid selector", options=options
-                )
+                which_grid = st.radio("Y-axis grid selector", options=options)
                 font_size = st.number_input(
                     "Label font size", min_value=4, value=14, key="font_size_comparison"
                 )
@@ -457,6 +455,7 @@ if enable:
                                     mode="markers",
                                     marker_symbol=primary_marker,
                                     line=dict(color=container.hex_color),
+                                    showlegend=True if cycling_index == 0 else False,
                                 ),
                                 secondary_y=False,
                             )
@@ -470,7 +469,10 @@ if enable:
                                     mode="markers",
                                     marker_symbol=secondary_marker,
                                     line=dict(color=container.hex_color),
-                                    showlegend=False,
+                                    showlegend=True
+                                    if y_axis_mode == "Only secondary"
+                                    and cycling_index == 0
+                                    else False,
                                 ),
                                 secondary_y=True,
                             )
@@ -529,7 +531,9 @@ if enable:
                 figure_data = fig.full_figure_for_development(warn=False)
 
                 if selected_points != [] and selected_points is not None:
-                    selected_cycles = ", ".join([str(point["x"]) for point in selected_points])
+                    selected_cycles = ", ".join(
+                        [str(point["x"]) for point in selected_points]
+                    )
                     st.write(f"Currently selected points: {selected_cycles}")
 
                 with chide:
