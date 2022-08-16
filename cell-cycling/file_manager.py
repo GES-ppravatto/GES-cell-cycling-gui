@@ -185,6 +185,7 @@ with manipulation_tab:
             st.markdown(f"Internal ID: `{status.get_index_of(name)}`")
 
         with col2:
+            # Define a danger zone with red text to delete an experiment from memory
             st.markdown(
                 """### <span style="color:red"> Danger zone:</span>""",
                 unsafe_allow_html=True,
@@ -207,6 +208,8 @@ with manipulation_tab:
         col1, col2 = st.columns(2)
 
         with col1:
+            
+            #Allow the user to re-define the experiment name
             st.markdown("##### Experiment name:")
             new_experiment_name = st.text_input("Experiment name", name)
             if new_experiment_name != name:
@@ -214,6 +217,7 @@ with manipulation_tab:
                 st.session_state["SelectedExperimentName"] = new_experiment_name
                 st.experimental_rerun()
 
+            # Allow the user to re-define the experiment volume
             st.markdown("##### Electrolite volume:")
             volume_str = st.text_input(
                 "Volume of the electrolyte (L)",
@@ -235,8 +239,9 @@ with manipulation_tab:
                         st.experimental_rerun()
 
         with col2:
+            
+            # Allow the user to select if the self-cleaning option must be used
             st.markdown("##### Clean non-physical cycles")
-
             clean_status = st.checkbox(
                 " Allow only efficiencies <100% and complete charge/discharge cycles",
                 value=experiment.clean,
@@ -245,6 +250,7 @@ with manipulation_tab:
                 experiment.clean = clean_status
                 st.experimental_rerun()
 
+            # Allow the user to select a base color for the experiment to be used in the stacked-plot
             st.markdown("##### Base color:")
             current_color = RGB_to_HEX(*experiment.color.get_RGB())
             color = st.color_picker(

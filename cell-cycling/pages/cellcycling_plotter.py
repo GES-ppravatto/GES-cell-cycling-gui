@@ -8,7 +8,8 @@ from core.gui_core import Experiment, ProgramStatus, get_plotly_color
 
 from echemsuite.cellcycling.cycles import CellCycling
 
-
+# Define an Experiment container to hold all the experiments related to a single multi-parameter
+# cycling experiment
 class ExperimentContainer:
     def __init__(self, name: str, color: str = None) -> None:
         self._name = name
@@ -72,7 +73,7 @@ class ExperimentContainer:
 
         self._experiments[experiment_id].hide_cycle(cycle_id)
 
-
+# Define a dictionary of available markers with their plotly name
 MARKERS = {
     "●": "circle",
     "■": "square",
@@ -82,6 +83,7 @@ MARKERS = {
     "X": "x",
 }
 
+# Define a list of possible alternatives for the y axis
 Y_OPTIONS = [
     "Capacity retention",
     "Columbic efficiency",
@@ -90,6 +92,7 @@ Y_OPTIONS = [
 ]
 
 
+# Define a function to exracte the wanted dataset from a cellcycling experiment give the label
 def get_data_series(option: str, cellcycling: CellCycling) -> List[float]:
 
     if option not in Y_OPTIONS:
@@ -107,6 +110,7 @@ def get_data_series(option: str, cellcycling: CellCycling) -> List[float]:
         raise RuntimeError
 
 
+# Initialize the session state with the page specific variables 
 if "ExperimentContainers" not in st.session_state:
     st.session_state["ExperimentContainers"] = []
     st.session_state["CellCycling_plot_limits"] = {"x": [None, None], "y": [None, None]}
@@ -135,6 +139,7 @@ st.write(
 
 if enable:
 
+    # Fetch fresh reference to the variables in session state
     available_containers: List[ExperimentContainer] = st.session_state[
         "ExperimentContainers"
     ]
@@ -143,8 +148,10 @@ if enable:
     ]
     annotation_dict: dict = st.session_state["PlotAnnotations"]
 
+    # Define a two tab page with a container editor and a plotter
     container_tab, plot_tab = st.tabs(["Container editor", "Container plotter"])
 
+    # Define the container editor tab
     with container_tab:
 
         with st.expander("Create new experiment container", expanded=True):
@@ -155,6 +162,8 @@ if enable:
                 cell-cycling experiments and edit the ones eventually available"""
             )
 
+            # Create a setup section in which the user can create a new experiment given a 
+            # name, a list of experiments to load and a custom color
             col1, col2, col3 = st.columns([2, 2, 1])
 
             with col1:
@@ -198,11 +207,12 @@ if enable:
                 else:
                     st.error(f"ERROR: the name '{container_name}' is already taken.")
 
+        # If there are already loaded container allow the user to edit or delete them
         if available_containers != []:
-
+            
             with st.expander("Edit experiment container", expanded=False):
+                
                 st.markdown("#### Edit an existing container")
-
                 selected_container_name = st.selectbox(
                     "Select the container to edit",
                     [obj.name for obj in available_containers],
@@ -280,8 +290,10 @@ if enable:
                             selected_container.remove_experiment(name)
                         st.experimental_rerun()
 
+    # Define a plot tab to hold the plotted data
     with plot_tab:
 
+        # Visualize something only if there are available containers
         if available_containers != []:
 
             st.markdown("#### Cell-cycling plotter")
@@ -289,12 +301,15 @@ if enable:
                 """In this tab you can create a cell cycling plot and interactively selecting
                 its appearence"""
             )
-
+            
+            # Define an annotation editor if there is a plot to which the annotations can be
+            # added (plot_limits will be initialized on plot change and a rerun will be triggered)
             if plot_limits["x"][0] != None:
 
                 with st.expander("Annotation editor", expanded=False):
                     st.markdown("###### Global annotation settings")
 
+                    # Let the user define the annotation font size and color
                     col1, col2 = st.columns(2)
 
                     with col1:
@@ -308,7 +323,9 @@ if enable:
                         annotation_color = st.color_picker(
                             "Select annotation color", value="#000000"
                         )
-
+                    
+                    # Define and annotation editor in which the user can select the mode of
+                    # operation, the annotation content and its x-y position
                     st.markdown("###### Edit annotation")
 
                     col1, col2, col3, col4 = st.columns(4)
@@ -369,8 +386,10 @@ if enable:
                         if annotation is not None and annotation != "":
                             annotation_dict[annotation] = [x_position, y_position]
 
+            # Initialize a set of columns on top of the plot section to hold buttons
             chide, cunhide, crefresh = st.columns(3)
 
+            # Define an unhide button to unhide all the manually hided cycles
             with cunhide:
                 unhide = st.button("👁 Unhide all")
 
@@ -381,6 +400,7 @@ if enable:
 
             col1, col2 = st.columns([4, 1])
 
+            # Define a small column on the right to hold the plot options
             with col2:
 
                 st.markdown("###### Series selector")
@@ -428,11 +448,13 @@ if enable:
                 # Create a figure object with the secondary y-axis option enabled
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
 
+                # Iterate over each container
                 for container in available_containers:
 
                     offset = 0
                     cellcycling: CellCycling = None
 
+                    # Iterate over each cell_cycling object in the container
                     for cycling_index, (name, cellcycling) in enumerate(container):
 
                         if cycling_index != 0:
@@ -525,10 +547,13 @@ if enable:
                     plot_bgcolor="#FFFFFF",
                 )
 
+                # Use the plotly event widget to allow for interactive selection of points
+                # on the plot
                 selected_points = plotly_events(
                     fig, click_event=False, select_event=True, override_height=height
                 )
 
+                # Get the figure data to localize the selected points and to get the plot limits
                 figure_data = fig.full_figure_for_development(warn=False)
 
                 if selected_points != [] and selected_points is not None:
@@ -537,6 +562,7 @@ if enable:
                     )
                     st.success(f"Currently selected points: {selected_cycles}")
 
+                # render the cycle hide button (enabled only if there are selected points)
                 with chide:
                     hide = st.button(
                         "🚫 Hide cycles",
@@ -558,15 +584,15 @@ if enable:
                             )
 
                         st.experimental_rerun()
-
+                
+                # Render a referesh button to manually trigger a rerun
                 with crefresh:
                     refresh = st.button("♻ Refresh")
 
                     if refresh:
                         st.experimental_rerun()
 
-                # st.plotly_chart(fig, use_container_width=True)
-
+                # Evaluate the current plot limits
                 xrange = figure_data.layout.xaxis.range
                 yrange = figure_data.layout.yaxis.range
 
@@ -579,7 +605,8 @@ if enable:
                     st.experimental_rerun()
 
             with col2:
-
+                
+                # Add an export option
                 st.markdown("###### Export")
                 format = st.selectbox(
                     "Select the format of the file", ["png", "jpeg", "svg", "pdf"]
@@ -592,6 +619,7 @@ if enable:
                     value=1000,
                 )
 
+                # Redefine layout options to account for user selected width
                 fig.update_layout(
                     height=height,
                     width=width,

@@ -42,6 +42,9 @@ def get_halfcycle_series(
         title : str
             the title of the series to be taken from the halfcycle. Note that the title
             must match one of the entries of the HALFCYCLE_SERIES list variable.
+        volume: Union[None, float]
+            if not None will return a custom label together with the volumetric property (if
+            relevant) 
     """
     if title == "time (s)":
         return "time (s)", halfcycle.time
@@ -109,6 +112,7 @@ if enable:
 
     stacked_plot, comparison_plot = st.tabs(["Stacked plot", "Comparison plot"])
 
+    # Define the stacked plot tab to compare cycling of different experiments
     with stacked_plot:
 
         st.markdown("### Experiments plotter")
@@ -274,10 +278,12 @@ if enable:
                     else:
                         st.markdown("###### Data series editor")
 
+                        # Reset all labels given to the series
                         reset = st.button("🧹 Reset all names")
                         if reset:
                             selected_experiments.reset_default_labels(current_view)
 
+                        # Let the user select the series and its new name
                         selected_series_to_edit = st.selectbox(
                             "Select the cycle series to edit",
                             selected_experiments[current_view],
@@ -301,8 +307,8 @@ if enable:
 
             col1, col2 = st.columns([4, 1])
 
+            # Visualize some plot options in a small coulomn on the right
             with col2:
-
                 st.markdown("#### Plot options")
 
                 st.markdown("###### Axis")
@@ -458,6 +464,7 @@ if enable:
                     value=suggested_width if suggested_width <= 2000 else 2000,
                 )
 
+                # Set new layout options to account for the user selected width
                 fig.update_layout(
                     plot_bgcolor="#FFFFFF",
                     height=plot_height * len(selected_experiments.names),
@@ -471,8 +478,11 @@ if enable:
                     file_name=f"cycle_plot.{format}",
                 )
 
+    # Define a comparison plot tab to compare cycle belonging to different experiments
     with comparison_plot:
 
+        # Create a manager section allowing the user to select the trace to plot based on
+        # the experiment name and the cycle number
         col1, col2, col3 = st.columns([2, 2, 1])
 
         with col1:
@@ -516,6 +526,7 @@ if enable:
                 )
                 st.experimental_rerun()
 
+        #Create a setup section to define the series to visualize and their color/name
         if selected_series != []:
 
             with st.expander("Series options:", expanded=True):
@@ -557,6 +568,8 @@ if enable:
 
             col1, col2 = st.columns([4, 1])
 
+            # Create a small column on the right to allow the user to set some properties of
+            # the plot
             with col2:
 
                 st.markdown("#### Plot options")
@@ -586,10 +599,6 @@ if enable:
                     key="comparison_plot",
                 )
 
-                # st.markdown("###### Series")
-                # show_charge = st.checkbox("Show charge", value=True)
-                # show_discharge = st.checkbox("Show discharge", value=True)
-
                 st.markdown("###### Aspect")
                 font_size = st.number_input(
                     "Label font size", min_value=4, value=14, key="font_size_comparison"
@@ -600,10 +609,10 @@ if enable:
 
             with col1:
 
-                # Create a figure with a number of subplots equal to the numebr of selected experiments
+                # Create a figure with a single plo
                 fig = make_subplots(cols=1, rows=1)
 
-                # For eache experiment update the correspondent subplot
+                # For each selected series add an independent trace to the plot
                 for entry in selected_series:
 
                     name = entry.experiment_name
@@ -680,7 +689,8 @@ if enable:
                 st.plotly_chart(fig, use_container_width=True)
 
             with col2:
-
+                
+                #Add to the right column the export option
                 st.markdown("###### Export")
                 format = st.selectbox(
                     "Select the format of the file",
@@ -696,7 +706,7 @@ if enable:
                     value=suggested_width if suggested_width <= 2000 else 2000,
                 )
 
-                # Update the settings of plot layout
+                # Update the settings of plot layout to account for the user define width
                 fig.update_layout(
                     plot_bgcolor="#FFFFFF",
                     height=height,
