@@ -13,6 +13,23 @@ from colorsys import rgb_to_hsv, rgb_to_hls, hsv_to_rgb, hls_to_rgb
 from echemsuite.cellcycling.read_input import FileManager, Instrument
 from echemsuite.cellcycling.cycles import Cycle, CellCycling
 
+
+# %% Define function to unset header and development menu
+
+
+def set_production_page_style():
+
+    hide_st_style = """
+                <style>
+                #MainMenu {visibility: hidden;}
+                footer {visibility: hidden;}
+                header {visibility: hidden;}
+                </style>
+                """
+
+    st.markdown(hide_st_style, unsafe_allow_html=True)
+
+
 # %% Define functions to operate on colors
 
 
@@ -330,7 +347,7 @@ class Experiment:
         self._skipped_files = 0
 
     def _update_cycles_based_objects(self) -> None:
-        self._cycles = self._manager.get_cycles(self._ordering, self._clean)            
+        self._cycles = self._manager.get_cycles(self._ordering, self._clean)
         self._cellcycling = CellCycling(self._cycles)
         self._cellcycling.hide(self._manual_hide)
 
@@ -397,7 +414,7 @@ class Experiment:
     def hide_cycle(self, index: int) -> None:
         self._manual_hide.append(index)
         self._update_cycles_based_objects()
-    
+
     def unhide_all_cycles(self) -> None:
         self._manual_hide = []
         self._update_cycles_based_objects()
