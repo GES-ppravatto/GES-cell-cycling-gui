@@ -95,23 +95,47 @@ Y_OPTIONS = [
     "Columbic efficiency",
     "Energy efficiency",
     "Voltaic Efficiency",
+    "Total energy - Discharge",
+    "Total capacity - Discharge",
 ]
 
 
 # Define a function to exracte the wanted dataset from a cellcycling experiment give the label
-def get_data_series(option: str, cellcycling: CellCycling) -> List[float]:
+def get_data_series(
+    option: str, cellcycling: CellCycling, volume: Union[float, None] = None
+) -> Tuple[str, List[float]]:
 
     if option not in Y_OPTIONS:
         raise TypeError
 
+    if volume is not None and volume <= 0:
+        raise ValueError
+
     if option == "Capacity retention":
-        return cellcycling.capacity_retention
+        return "Capacity retention (%)", cellcycling.capacity_retention
     elif option == "Columbic efficiency":
-        return cellcycling.coulomb_efficiencies
+        return "Columbic efficiency (%)", cellcycling.coulomb_efficiencies
     elif option == "Energy efficiency":
-        return cellcycling.energy_efficiencies
+        return "Energy efficiency (%)", cellcycling.energy_efficiencies
     elif option == "Voltaic Efficiency":
-        return cellcycling.voltage_efficiencies
+        return "Voltaic Efficiency (%)", cellcycling.voltage_efficiencies
+    elif option == "Total energy - Discharge":
+        total_energies = [cycle.discharge.total_energy for cycle in cellcycling]
+        if volume is None:
+            return "Discharge Total energy (mWh)", total_energies
+        else:
+            return "Volumetric Discharge Total energy (Wh/L)", [
+                energy / (1000 * volume) for energy in total_energies
+            ]
+
+    elif option == "Total capacity - Discharge":
+        total_capacities = [cycle.discharge.capacity for cycle in cellcycling]
+        if volume is None:
+            return "Discharge Total capacity (mAh)", total_capacities
+        else:
+            return "volumetric Discharge Total capacity (Ah/L)", [
+                capacity / (1000 * volume) for capacity in total_capacities
+            ]
     else:
         raise RuntimeError
 
@@ -425,6 +449,19 @@ if enable:
                     ["Both", "Only primary", "Only secondary"],
                 )
 
+                volume_is_available = True
+                for container in available_containers:
+                    for name in container.get_experiment_names:
+                        experiment_id = status.get_index_of(name)
+                        experiment = status[experiment_id]
+                        if experiment.volume is None:
+                            volume_is_available = False
+                            break
+
+                scale_by_volume = st.checkbox(
+                    "Scale values by volume", value=False, disabled=not volume_is_available
+                )
+
                 st.markdown("###### Graph options")
                 primary_axis_marker = st.selectbox(
                     "Select primary Y axis markers", [m for m in MARKERS.keys()]
@@ -464,13 +501,23 @@ if enable:
                     # Iterate over each cell_cycling object in the container
                     for cycling_index, (name, cellcycling) in enumerate(container):
 
+                        experiment = status[status.get_index_of(name)]
+
                         if cycling_index != 0:
                             offset += container.max_cycles_numbers[cycling_index - 1] + 1
 
                         cycle_index = [n + offset for n in cellcycling.numbers]
 
-                        primary_axis = get_data_series(primary_axis_name, cellcycling)
-                        secondary_axis = get_data_series(secondary_axis_name, cellcycling)
+                        primary_label, primary_axis = get_data_series(
+                            primary_axis_name,
+                            cellcycling,
+                            volume=experiment.volume if scale_by_volume else None,
+                        )
+                        secondary_label, secondary_axis = get_data_series(
+                            secondary_axis_name,
+                            cellcycling,
+                            volume=experiment.volume if scale_by_volume else None,
+                        )
 
                         primary_marker = MARKERS[primary_axis_marker]
                         secondary_marker = MARKERS[secondary_axis_marker]
@@ -527,7 +574,7 @@ if enable:
                     gridcolor="#DDDDDD",
                 )
                 fig.update_yaxes(
-                    title_text=primary_axis_name,
+                    title_text=primary_label,
                     # color=primary_axis_color,
                     secondary_y=False,
                     showline=True,
@@ -536,7 +583,7 @@ if enable:
                     gridcolor="#DDDDDD" if which_grid == "Primary" else None,
                 )
                 fig.update_yaxes(
-                    title_text=secondary_axis_name,
+                    title_text=secondary_label,
                     # color=secondary_axis_color,
                     secondary_y=True,
                     showline=True,
