@@ -1,0 +1,6 @@
+numpy
+plotly
+palettable
+streamlit
+kaleido
+streamlit-plotly-events
