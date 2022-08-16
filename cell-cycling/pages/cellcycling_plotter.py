@@ -4,7 +4,12 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from streamlit_plotly_events import plotly_events
 
-from core.gui_core import Experiment, ProgramStatus, get_plotly_color
+from core.gui_core import (
+    Experiment,
+    ProgramStatus,
+    get_plotly_color,
+    set_production_page_style,
+)
 
 from echemsuite.cellcycling.cycles import CellCycling
 
@@ -73,6 +78,7 @@ class ExperimentContainer:
 
         self._experiments[experiment_id].hide_cycle(cycle_id)
 
+
 # Define a dictionary of available markers with their plotly name
 MARKERS = {
     "●": "circle",
@@ -110,7 +116,7 @@ def get_data_series(option: str, cellcycling: CellCycling) -> List[float]:
         raise RuntimeError
 
 
-# Initialize the session state with the page specific variables 
+# Initialize the session state with the page specific variables
 if "ExperimentContainers" not in st.session_state:
     st.session_state["ExperimentContainers"] = []
     st.session_state["CellCycling_plot_limits"] = {"x": [None, None], "y": [None, None]}
@@ -128,6 +134,7 @@ else:
         enable = False
 
 st.set_page_config(layout="wide")
+set_production_page_style()
 
 # Set the title of the page and print some generic instruction
 st.title("Cell-cycling plotter")
@@ -162,7 +169,7 @@ if enable:
                 cell-cycling experiments and edit the ones eventually available"""
             )
 
-            # Create a setup section in which the user can create a new experiment given a 
+            # Create a setup section in which the user can create a new experiment given a
             # name, a list of experiments to load and a custom color
             col1, col2, col3 = st.columns([2, 2, 1])
 
@@ -209,9 +216,9 @@ if enable:
 
         # If there are already loaded container allow the user to edit or delete them
         if available_containers != []:
-            
+
             with st.expander("Edit experiment container", expanded=False):
-                
+
                 st.markdown("#### Edit an existing container")
                 selected_container_name = st.selectbox(
                     "Select the container to edit",
@@ -301,7 +308,7 @@ if enable:
                 """In this tab you can create a cell cycling plot and interactively selecting
                 its appearence"""
             )
-            
+
             # Define an annotation editor if there is a plot to which the annotations can be
             # added (plot_limits will be initialized on plot change and a rerun will be triggered)
             if plot_limits["x"][0] != None:
@@ -323,7 +330,7 @@ if enable:
                         annotation_color = st.color_picker(
                             "Select annotation color", value="#000000"
                         )
-                    
+
                     # Define and annotation editor in which the user can select the mode of
                     # operation, the annotation content and its x-y position
                     st.markdown("###### Edit annotation")
@@ -584,7 +591,7 @@ if enable:
                             )
 
                         st.experimental_rerun()
-                
+
                 # Render a referesh button to manually trigger a rerun
                 with crefresh:
                     refresh = st.button("♻ Refresh")
@@ -605,7 +612,7 @@ if enable:
                     st.experimental_rerun()
 
             with col2:
-                
+
                 # Add an export option
                 st.markdown("###### Export")
                 format = st.selectbox(

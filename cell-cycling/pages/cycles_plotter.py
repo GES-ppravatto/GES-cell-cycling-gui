@@ -13,6 +13,7 @@ from core.gui_core import (
     SingleCycleSeries,
     RGB_to_HEX,
     get_plotly_color,
+    set_production_page_style,
 )
 from echemsuite.cellcycling.cycles import HalfCycle
 
@@ -44,7 +45,7 @@ def get_halfcycle_series(
             must match one of the entries of the HALFCYCLE_SERIES list variable.
         volume: Union[None, float]
             if not None will return a custom label together with the volumetric property (if
-            relevant) 
+            relevant)
     """
     if title == "time (s)":
         return "time (s)", halfcycle.time
@@ -54,12 +55,12 @@ def get_halfcycle_series(
         return "current (A)", halfcycle.current
     elif title == "charge (mAh)":
         if volume is not None:
-            return "charge per unit volume (mAh/L)", halfcycle.Q / volume  
+            return "charge per unit volume (mAh/L)", halfcycle.Q / volume
         else:
             return "charge (mAh)", halfcycle.Q
     elif title == "energy (mWh)":
         if volume is not None:
-            return "energy per unit volume (mWh/L)", halfcycle.energy / volume  
+            return "energy per unit volume (mWh/L)", halfcycle.energy / volume
         else:
             return "energy (mWh)", halfcycle.energy
     else:
@@ -95,6 +96,8 @@ status: ProgramStatus = st.session_state["ProgramStatus"]
 selected_experiments: ExperimentSelector = st.session_state["CyclePlotSelection"]
 selected_series: List[SingleCycleSeries] = st.session_state["ComparisonPlot"]
 
+st.set_page_config(layout="wide")
+set_production_page_style()
 
 # Set the title of the page and print some generic instruction
 st.title("Cycles plotter")
@@ -383,8 +386,12 @@ if enable:
 
                             series_name = selected_experiments.get_label(name, cycle_id)
 
-                            x_label, x_series = get_halfcycle_series(cycle.charge, x_axis, volume)
-                            y_label, y_series = get_halfcycle_series(cycle.charge, y_axis, volume)
+                            x_label, x_series = get_halfcycle_series(
+                                cycle.charge, x_axis, volume
+                            )
+                            y_label, y_series = get_halfcycle_series(
+                                cycle.charge, y_axis, volume
+                            )
 
                             fig.add_trace(
                                 go.Scatter(
@@ -526,7 +533,7 @@ if enable:
                 )
                 st.experimental_rerun()
 
-        #Create a setup section to define the series to visualize and their color/name
+        # Create a setup section to define the series to visualize and their color/name
         if selected_series != []:
 
             with st.expander("Series options:", expanded=True):
@@ -628,8 +635,12 @@ if enable:
                     # Print the charge halfcycle
                     if cycle.charge is not None:
 
-                        x_label, x_series = get_halfcycle_series(cycle.charge, x_axis, volume)
-                        y_label, y_series = get_halfcycle_series(cycle.charge, y_axis, volume)
+                        x_label, x_series = get_halfcycle_series(
+                            cycle.charge, x_axis, volume
+                        )
+                        y_label, y_series = get_halfcycle_series(
+                            cycle.charge, y_axis, volume
+                        )
 
                         fig.add_trace(
                             go.Scatter(
@@ -645,8 +656,12 @@ if enable:
                     # Print the discharge halfcycle
                     if cycle.discharge is not None:
 
-                        x_label, x_series = get_halfcycle_series(cycle.discharge, x_axis, volume)
-                        y_label, y_series = get_halfcycle_series(cycle.discharge, y_axis, volume)
+                        x_label, x_series = get_halfcycle_series(
+                            cycle.discharge, x_axis, volume
+                        )
+                        y_label, y_series = get_halfcycle_series(
+                            cycle.discharge, y_axis, volume
+                        )
 
                         fig.add_trace(
                             go.Scatter(
@@ -689,8 +704,8 @@ if enable:
                 st.plotly_chart(fig, use_container_width=True)
 
             with col2:
-                
-                #Add to the right column the export option
+
+                # Add to the right column the export option
                 st.markdown("###### Export")
                 format = st.selectbox(
                     "Select the format of the file",

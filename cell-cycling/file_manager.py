@@ -8,8 +8,8 @@ from core.gui_core import (
     _EXPERIMENT_INIT_COUNTER_,
     RGB_to_HEX,
     HEX_to_RGB,
+    set_production_page_style,
 )
-
 
 if "ProgramStatus" not in st.session_state:
     st.session_state["ProgramStatus"] = ProgramStatus()
@@ -18,6 +18,7 @@ if "ProgramStatus" not in st.session_state:
     st.session_state["SelectedExperimentName"] = None
 
 st.set_page_config(layout="wide")
+set_production_page_style()
 
 st.title("Experiment file manager")
 
@@ -208,8 +209,8 @@ with manipulation_tab:
         col1, col2 = st.columns(2)
 
         with col1:
-            
-            #Allow the user to re-define the experiment name
+
+            # Allow the user to re-define the experiment name
             st.markdown("##### Experiment name:")
             new_experiment_name = st.text_input("Experiment name", name)
             if new_experiment_name != name:
@@ -239,7 +240,7 @@ with manipulation_tab:
                         st.experimental_rerun()
 
         with col2:
-            
+
             # Allow the user to select if the self-cleaning option must be used
             st.markdown("##### Clean non-physical cycles")
             clean_status = st.checkbox(
