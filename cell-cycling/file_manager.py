@@ -232,6 +232,7 @@ with manipulation_tab:
                 else:
                     if volume != experiment.volume:
                         experiment.volume = volume
+                        st.experimental_rerun()
 
         with col2:
             st.markdown("##### Clean non-physical cycles")
@@ -242,6 +243,7 @@ with manipulation_tab:
             )
             if clean_status != experiment.clean:
                 experiment.clean = clean_status
+                st.experimental_rerun()
 
             st.markdown("##### Base color:")
             current_color = RGB_to_HEX(*experiment.color.get_RGB())
