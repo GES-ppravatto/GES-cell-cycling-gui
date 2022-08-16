@@ -7,7 +7,7 @@ INSTALL_DIR="/usr/share/GES-echem-gui"
 CONDA_BASE_DIR=`conda info --base`
 CONDA_ENV="GES-echem-gui-server"
 GES_ECHEM_SUITE_REPO="https://github.com/GES-ppravatto/GES-echem-suite.git"
-RC_LOCAL_FILE="/etc/rc.d/rc.local"
+SYSTEMD_SERVICE="/etc/systemd/system/ges-echem-gui.service"
 
 if [[ $1 == "install" ]]; then
 
@@ -20,18 +20,17 @@ if [[ $1 == "install" ]]; then
     echo "-> Creating custom conda environment"
     conda create -y --name $CONDA_ENV python=3.8 > "/dev/null"
 
-    echo "-> Installing requirements"
+    echo "-> Installing requirements in the conda environment"
     source "$CONDA_BASE_DIR/etc/profile.d/conda.sh" > "/dev/null"
     conda activate $CONDA_ENV > "/dev/null"
     pip install -r "../requirements.txt" > "/dev/null"
     pip install "./GES-echem-suite" > "/dev/null"
     conda deactivate
 
-    echo "-> Clean up downloaded files"
+    echo "-> Cleaning up downloaded files"
     rm -rf "./GES-echem-suite"
 
     echo "-> Creating custom launcher script"
-    touch "./echem-gui-launcher.sh"
     echo "#!/bin/bash" >> "./echem-gui-launcher.sh"
     echo "source $CONDA_BASE_DIR/etc/profile.d/conda.sh" >> "./echem-gui-launcher.sh"
     echo "conda activate $CONDA_ENV" >> "./echem-gui-launcher.sh"
@@ -48,31 +47,28 @@ if [[ $1 == "install" ]]; then
     echo "   -> Moving launcher script"
     sudo mv "./echem-gui-launcher.sh" $INSTALL_DIR
 
-    echo "-> Generating rc.local file entry"
-    touch "./new_rc_local.txt"
-    if [[ -f "$RC_LOCAL_FILE" ]]; then
-        echo "   -> rc.local file found"
-        echo "   -> updating rc.local file"
-        sudo sed "/exit 0/d" $RC_LOCAL_FILE >> "./new_rc_local.txt"
-    else
-        echo "   -> rc.local file not found"
-        echo "   -> creating rc.local file"
-        echo "#!/bin/sh -e" >> "./new_rc_local.txt"
-    fi
-    
-    echo "sh $INSTALL_DIR/echem-gui-launcher.sh &" >> "./new_rc_local.txt"
-    echo "exit 0" >> "./new_rc_local.txt"
-    sudo mv "./new_rc_local.txt" $RC_LOCAL_FILE
-    sudo chown root $RC_LOCAL_FILE
-    sudo chmod 755 $RC_LOCAL_FILE
+    echo "-> Creating a custom ges-echem-gui service"
+    echo "[Unit]" > "./service.txt"
+    echo "Description=GES-echem-gui http page service" >> "./service.txt"
+    echo "" >> "./service.txt"
+    echo "[Service]" >> "./service.txt"
+    echo "ExecStart=$INSTALL_DIR/echem-gui-launcher.sh" >> "./service.txt"
+    echo "" >> "./service.txt"
+    echo "[Install]" >> "./service.txt"
+    echo "WantedBy=multi-user.target" >> "./service.txt"
+    sudo mv "./service.txt" $SYSTEMD_SERVICE
+    sudo systemctl daemon-reload
 
     echo "-> Adding http firewall rule (port 80)"
     sudo firewall-cmd --permanent --add-service=http
     sudo firewall-cmd --reload
     sudo systemctl restart firewalld.service
 
-    echo "-> Starting streamlit server"
-    sudo nohup "$INSTALL_DIR/echem-gui-launcher.sh" 
+    echo "-> Starting and enabling the ges-echem-gui service"
+    sudo systemctl start ges-echem-gui.service
+    sudo systemctl enable ges-echem-gui.service
+
+    exit 0
 
 elif [[ $1 == "remove" ]]; then
 	echo "GES-echem-gui uninstall"
@@ -82,10 +78,12 @@ elif [[ $1 == "remove" ]]; then
     sudo firewall-cmd --reload
     sudo systemctl restart firewalld.service
 
-    echo "-> Cleaning the rc.local file"
-    sudo cp $RC_LOCAL_FILE "./old_rc_local.txt"
-    sed -i "/echem-gui-launcher.sh/d" "./old_rc_local.txt"
-    sudo mv "./old_rc_local.txt" $RC_LOCAL_FILE
+    echo "-> Stopping and disabling the ges-echem-gui service"
+    sudo systemctl stop ges-echem-gui.service
+    sudo systemctl disable ges-echem-gui.service
+
+    echo "-> Removing the ges-echem-gui service"
+    sudo rm $SYSTEMD_SERVICE
 
     echo "-> Removing installed files"
     sudo rm -rf $INSTALL_DIR

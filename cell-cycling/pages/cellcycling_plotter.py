@@ -518,6 +518,7 @@ if enable:
 
                 # Apply proper formatting to legend and plot background
                 fig.update_layout(
+                    font=dict(size=font_size),
                     legend=dict(
                         orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5
                     ),
@@ -534,7 +535,7 @@ if enable:
                     selected_cycles = ", ".join(
                         [str(point["x"]) for point in selected_points]
                     )
-                    st.write(f"Currently selected points: {selected_cycles}")
+                    st.success(f"Currently selected points: {selected_cycles}")
 
                 with chide:
                     hide = st.button(
