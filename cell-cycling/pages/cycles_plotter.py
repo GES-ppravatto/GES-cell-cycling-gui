@@ -21,11 +21,11 @@ from echemsuite.cellcycling.cycles import HalfCycle
 # %% Definition of labels and functions specific to the cycles plotting
 
 HALFCYCLE_SERIES = [
-    "time (s)",
-    "voltage (V)",
-    "current (A)",
-    "charge (mAh)",
-    "energy (mWh)",
+    "time",
+    "voltage",
+    "current",
+    "charge",
+    "energy",
 ]
 
 
@@ -47,20 +47,20 @@ def get_halfcycle_series(
             if not None will return a custom label together with the volumetric property (if
             relevant)
     """
-    if title == "time (s)":
+    if title == "time":
         return "time (s)", halfcycle.time
-    elif title == "voltage (V)":
+    elif title == "voltage":
         return "voltage (V)", halfcycle.voltage
-    elif title == "current (A)":
+    elif title == "current":
         return "current (A)", halfcycle.current
-    elif title == "charge (mAh)":
+    elif title == "charge":
         if volume is not None:
-            return "charge per unit volume (mAh/L)", halfcycle.Q / volume
+            return "volumic charge (Ah/L)", halfcycle.Q / (1000*volume)
         else:
             return "charge (mAh)", halfcycle.Q
-    elif title == "energy (mWh)":
+    elif title == "energy":
         if volume is not None:
-            return "energy per unit volume (mWh/L)", halfcycle.energy / volume
+            return "volumic energy (Wh/L)", halfcycle.energy / (1000*volume)
         else:
             return "energy (mWh)", halfcycle.energy
     else:
