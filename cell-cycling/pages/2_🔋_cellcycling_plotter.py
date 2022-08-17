@@ -97,7 +97,7 @@ Y_OPTIONS = [
     "Voltaic Efficiency",
     "Total energy - Discharge",
     "Total capacity - Discharge",
-    "Average power - Discharge"
+    "Average power - Discharge",
 ]
 
 
@@ -175,29 +175,23 @@ def get_data_series(
             )
         else:
             raise RuntimeError
-    
+
     elif option == "Average power - Discharge":
         average_powers = [cycle.discharge.power.mean() for cycle in cellcycling]
 
         if volume is None and area is None:
             return "average power (W)", average_powers
         elif volume is not None and area is None:
-            average_powers = [
-                power / volume for power in average_powers
-            ]
+            average_powers = [power / volume for power in average_powers]
             return "normalized average power (W/L)", average_powers
         elif volume is None and area is not None:
-            average_powers = [
-                power / area for power in average_powers
-            ]
+            average_powers = [power / area for power in average_powers]
             return (
                 "normalized average power (W/cm<sup>2</sup>)",
                 average_powers,
             )
         elif volume is not None and area is not None:
-            average_powers = [
-                power / (volume * area) for power in average_powers
-            ]
+            average_powers = [power / (volume * area) for power in average_powers]
             return (
                 "normalized average power (W/L cm<sup>2</sup>)",
                 average_powers,

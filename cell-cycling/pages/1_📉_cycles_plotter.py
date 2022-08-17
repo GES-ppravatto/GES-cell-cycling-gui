@@ -80,7 +80,9 @@ def get_halfcycle_series(
         elif area is not None and volume is None:
             return "normalized charge (Ah/cm<sup>2</sup>)", charge / (1000 * area)
         elif area is not None and volume is not None:
-            return "normalized charge (Ah/L cm<sup>2</sup>)", charge / (1000 * volume * area)
+            return "normalized charge (Ah/L cm<sup>2</sup>)", charge / (
+                1000 * volume * area
+            )
         else:
             raise RuntimeError
 
@@ -106,7 +108,9 @@ def get_halfcycle_series(
         elif area is not None and volume is None:
             return "normalized energy (Wh/cm<sup>2</sup>)", energy / (1000 * area)
         elif area is not None and volume is not None:
-            return "normalized energy (Wh/L cm<sup>2</sup>)", energy / (1000 * volume * area)
+            return "normalized energy (Wh/L cm<sup>2</sup>)", energy / (
+                1000 * volume * area
+            )
         else:
             raise RuntimeError
 
@@ -666,6 +670,18 @@ if enable:
                     key="comparison_plot",
                 )
 
+                area_is_available = True
+                for name in selected_experiments.view.keys():
+                    experiment_id = status.get_index_of(name)
+                    experiment = status[experiment_id]
+                    if experiment.area is None:
+                        area_is_available = False
+                        break
+
+                scale_by_area = st.checkbox(
+                    "Scale values by area", value=False, disabled=not area_is_available
+                )
+
                 st.markdown("###### Aspect")
                 font_size = st.number_input(
                     "Label font size", min_value=4, value=14, key="font_size_comparison"
@@ -691,15 +707,16 @@ if enable:
                     label = entry.label
                     color = entry.hex_color
                     volume = status[exp_idx].volume if scale_by_volume else None
+                    area = status[exp_idx].area if scale_by_area else None
 
                     # Print the charge halfcycle
                     if cycle.charge is not None:
 
                         x_label, x_series = get_halfcycle_series(
-                            cycle.charge, x_axis, volume
+                            cycle.charge, x_axis, volume, area
                         )
                         y_label, y_series = get_halfcycle_series(
-                            cycle.charge, y_axis, volume
+                            cycle.charge, y_axis, volume, area
                         )
 
                         fig.add_trace(
