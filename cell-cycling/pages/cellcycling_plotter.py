@@ -174,7 +174,7 @@ def get_data_series(
             )
         else:
             raise RuntimeError
-            
+
     else:
         raise RuntimeError
 
@@ -189,6 +189,19 @@ if "ExperimentContainers" not in st.session_state:
         "y_annotation_reference": [None, None],
     }
     st.session_state["PlotAnnotations"] = {}
+
+
+def clear_y_plot_limit(which: str = "both") -> None:
+    plot_limits = st.session_state["CellCycling_plot_limits"]
+    if which == "y":
+        plot_limits["y"] = [None, None]
+    elif which == "y2":
+        plot_limits["y2"] = [None, None]
+    elif which == "both":
+        plot_limits["y"] = [None, None]
+        plot_limits["y2"] = [None, None]
+    else:
+        raise RuntimeError
 
 
 # Check if the main page has set up the proper session state variables and check that at
@@ -482,11 +495,16 @@ if enable:
                     st.markdown("###### Series selector")
 
                     primary_axis_name = st.selectbox(
-                        "Select the dataset for the primary Y axis", Y_OPTIONS
+                        "Select the dataset for the primary Y axis",
+                        Y_OPTIONS,
+                        on_change=clear_y_plot_limit,
+                        # kwargs={"which": "y"},
                     )
                     secondary_axis_name = st.selectbox(
                         "Select the dataset for the secondary Y axis",
                         [option for option in Y_OPTIONS if option != primary_axis_name],
+                        on_change=clear_y_plot_limit,
+                        # kwargs={"which": "y2"},
                     )
 
                     y_axis_mode = st.radio(
@@ -504,7 +522,9 @@ if enable:
                                 break
 
                     scale_by_volume = st.checkbox(
-                        "Scale values by volume", value=False, disabled=not volume_is_available
+                        "Scale values by volume",
+                        value=False,
+                        disabled=not volume_is_available,
                     )
 
                     area_is_available = True
@@ -546,7 +566,9 @@ if enable:
                         "Plot height", min_value=10, max_value=2000, value=600, step=10
                     )
 
-                    marker_size = int(st.number_input("Marker size", min_value=1, value=8, step=1))
+                    marker_size = int(
+                        st.number_input("Marker size", min_value=1, value=8, step=1)
+                    )
 
             with col1:
 
@@ -714,10 +736,17 @@ if enable:
                 xrange = figure_data.layout.xaxis.range
                 yrange = figure_data.layout.yaxis.range
 
-                if yrange is None:
-                    yrange = figure_data.layout.yaxis2.range
+                y2range = (
+                    figure_data.layout.yaxis2.range
+                    if hasattr(figure_data.layout, "yaxis2")
+                    else None
+                )
 
-                if plot_limits["x"] != xrange or plot_limits["y"] != yrange:
+                if (
+                    plot_limits["x"] != xrange
+                    or plot_limits["y"] != yrange
+                    or plot_limits["y2"] != y2range
+                ):
                     plot_limits["x"] = xrange
                     plot_limits["y"] = yrange if yrange is not None else plot_limits["y"]
                     plot_limits["y2"] = (
