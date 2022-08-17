@@ -102,7 +102,10 @@ Y_OPTIONS = [
 
 # Define a function to exracte the wanted dataset from a cellcycling experiment give the label
 def get_data_series(
-    option: str, cellcycling: CellCycling, volume: Union[float, None] = None
+    option: str,
+    cellcycling: CellCycling,
+    volume: Union[float, None] = None,
+    area: Union[float, None] = None,
 ) -> Tuple[str, List[float]]:
 
     if option not in Y_OPTIONS:
@@ -121,21 +124,57 @@ def get_data_series(
         return "Voltaic Efficiency (%)", cellcycling.voltage_efficiencies
     elif option == "Total energy - Discharge":
         total_energies = [cycle.discharge.total_energy for cycle in cellcycling]
-        if volume is None:
-            return "Discharge Total energy (mWh)", total_energies
-        else:
-            return "Volumetric Discharge Total energy (Wh/L)", [
-                energy / (1000 * volume) for energy in total_energies
+        if volume is None and area is None:
+            return "discharge total energy (mWh)", total_energies
+        elif volume is not None and area is None:
+            normalized_energies = [energy / (1000 * volume) for energy in total_energies]
+            return "normalized discharge total energy (Wh/L)", normalized_energies
+        elif volume is None and area is not None:
+            normalized_energies = [energy / (1000 * area) for energy in total_energies]
+            return (
+                "normalized discharge total energy (Wh/cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        elif volume is not None and area is not None:
+            normalized_energies = [
+                energy / (1000 * volume * area) for energy in total_energies
             ]
+            return (
+                "normalized discharge total energy (Wh/L cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        else:
+            raise RuntimeError
 
     elif option == "Total capacity - Discharge":
         total_capacities = [cycle.discharge.capacity for cycle in cellcycling]
-        if volume is None:
-            return "Discharge Total capacity (mAh)", total_capacities
-        else:
-            return "volumetric Discharge Total capacity (Ah/L)", [
+
+        if volume is None and area is None:
+            return "discharge total capacity (mAh)", total_capacities
+        elif volume is not None and area is None:
+            normalized_energies = [
                 capacity / (1000 * volume) for capacity in total_capacities
             ]
+            return "normalized discharge total capacity (Ah/L)", normalized_energies
+        elif volume is None and area is not None:
+            normalized_energies = [
+                capacity / (1000 * area) for capacity in total_capacities
+            ]
+            return (
+                "normalized discharge total capacity (Ah/cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        elif volume is not None and area is not None:
+            normalized_energies = [
+                capacity / (1000 * volume * area) for capacity in total_capacities
+            ]
+            return (
+                "normalized discharge total capacity (Ah/L cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        else:
+            raise RuntimeError
+            
     else:
         raise RuntimeError
 
@@ -462,6 +501,19 @@ if enable:
                     "Scale values by volume", value=False, disabled=not volume_is_available
                 )
 
+                area_is_available = True
+                for container in available_containers:
+                    for name in container.get_experiment_names:
+                        experiment_id = status.get_index_of(name)
+                        experiment = status[experiment_id]
+                        if experiment.area is None:
+                            area_is_available = False
+                            break
+
+                scale_by_area = st.checkbox(
+                    "Scale values by area", value=False, disabled=not area_is_available
+                )
+
                 st.markdown("###### Graph options")
                 primary_axis_marker = st.selectbox(
                     "Select primary Y axis markers", [m for m in MARKERS.keys()]
@@ -502,6 +554,8 @@ if enable:
                     for cycling_index, (name, cellcycling) in enumerate(container):
 
                         experiment = status[status.get_index_of(name)]
+                        volume = experiment.volume if scale_by_volume else None
+                        area = experiment.area if scale_by_area else None
 
                         if cycling_index != 0:
                             offset += container.max_cycles_numbers[cycling_index - 1] + 1
@@ -509,14 +563,10 @@ if enable:
                         cycle_index = [n + offset for n in cellcycling.numbers]
 
                         primary_label, primary_axis = get_data_series(
-                            primary_axis_name,
-                            cellcycling,
-                            volume=experiment.volume if scale_by_volume else None,
+                            primary_axis_name, cellcycling, volume=volume, area=area
                         )
                         secondary_label, secondary_axis = get_data_series(
-                            secondary_axis_name,
-                            cellcycling,
-                            volume=experiment.volume if scale_by_volume else None,
+                            secondary_axis_name, cellcycling, volume=volume, area=area
                         )
 
                         primary_marker = MARKERS[primary_axis_marker]
