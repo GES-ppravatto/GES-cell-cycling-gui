@@ -85,8 +85,8 @@ MARKERS = {
     "■": "square",
     "▲": "triangle-up",
     "▼": "triangle-down",
-    "+": "cross",
-    "X": "x",
+    "🞤": "cross",
+    "🞭": "x",
 }
 
 # Define a list of possible alternatives for the y axis
@@ -95,23 +95,110 @@ Y_OPTIONS = [
     "Columbic efficiency",
     "Energy efficiency",
     "Voltaic Efficiency",
+    "Total energy - Discharge",
+    "Total capacity - Discharge",
+    "Average power - Discharge",
 ]
 
 
 # Define a function to exracte the wanted dataset from a cellcycling experiment give the label
-def get_data_series(option: str, cellcycling: CellCycling) -> List[float]:
+def get_data_series(
+    option: str,
+    cellcycling: CellCycling,
+    volume: Union[float, None] = None,
+    area: Union[float, None] = None,
+) -> Tuple[str, List[float]]:
 
     if option not in Y_OPTIONS:
         raise TypeError
 
+    if volume is not None and volume <= 0:
+        raise ValueError
+
     if option == "Capacity retention":
-        return cellcycling.capacity_retention
+        return "Capacity retention (%)", cellcycling.capacity_retention
     elif option == "Columbic efficiency":
-        return cellcycling.coulomb_efficiencies
+        return "Columbic efficiency (%)", cellcycling.coulomb_efficiencies
     elif option == "Energy efficiency":
-        return cellcycling.energy_efficiencies
+        return "Energy efficiency (%)", cellcycling.energy_efficiencies
     elif option == "Voltaic Efficiency":
-        return cellcycling.voltage_efficiencies
+        return "Voltaic Efficiency (%)", cellcycling.voltage_efficiencies
+    elif option == "Total energy - Discharge":
+        total_energies = [cycle.discharge.total_energy for cycle in cellcycling]
+        if volume is None and area is None:
+            return "discharge total energy (mWh)", total_energies
+        elif volume is not None and area is None:
+            normalized_energies = [energy / (1000 * volume) for energy in total_energies]
+            return "normalized discharge total energy (Wh/L)", normalized_energies
+        elif volume is None and area is not None:
+            normalized_energies = [energy / (1000 * area) for energy in total_energies]
+            return (
+                "normalized discharge total energy (Wh/cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        elif volume is not None and area is not None:
+            normalized_energies = [
+                energy / (1000 * volume * area) for energy in total_energies
+            ]
+            return (
+                "normalized discharge total energy (Wh/L cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        else:
+            raise RuntimeError
+
+    elif option == "Total capacity - Discharge":
+        total_capacities = [cycle.discharge.capacity for cycle in cellcycling]
+
+        if volume is None and area is None:
+            return "discharge total capacity (mAh)", total_capacities
+        elif volume is not None and area is None:
+            normalized_energies = [
+                capacity / (1000 * volume) for capacity in total_capacities
+            ]
+            return "normalized discharge total capacity (Ah/L)", normalized_energies
+        elif volume is None and area is not None:
+            normalized_energies = [
+                capacity / (1000 * area) for capacity in total_capacities
+            ]
+            return (
+                "normalized discharge total capacity (Ah/cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        elif volume is not None and area is not None:
+            normalized_energies = [
+                capacity / (1000 * volume * area) for capacity in total_capacities
+            ]
+            return (
+                "normalized discharge total capacity (Ah/L cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        else:
+            raise RuntimeError
+
+    elif option == "Average power - Discharge":
+        average_powers = [cycle.discharge.power.mean() for cycle in cellcycling]
+
+        if volume is None and area is None:
+            return "average power (W)", average_powers
+        elif volume is not None and area is None:
+            average_powers = [power / volume for power in average_powers]
+            return "normalized average power (W/L)", average_powers
+        elif volume is None and area is not None:
+            average_powers = [power / area for power in average_powers]
+            return (
+                "normalized average power (W/cm<sup>2</sup>)",
+                average_powers,
+            )
+        elif volume is not None and area is not None:
+            average_powers = [power / (volume * area) for power in average_powers]
+            return (
+                "normalized average power (W/L cm<sup>2</sup>)",
+                average_powers,
+            )
+        else:
+            raise RuntimeError
+
     else:
         raise RuntimeError
 
@@ -119,8 +206,26 @@ def get_data_series(option: str, cellcycling: CellCycling) -> List[float]:
 # Initialize the session state with the page specific variables
 if "ExperimentContainers" not in st.session_state:
     st.session_state["ExperimentContainers"] = []
-    st.session_state["CellCycling_plot_limits"] = {"x": [None, None], "y": [None, None]}
+    st.session_state["CellCycling_plot_limits"] = {
+        "x": [None, None],
+        "y": [None, None],
+        "y2": [None, None],
+        "y_annotation_reference": [None, None],
+    }
     st.session_state["PlotAnnotations"] = {}
+
+
+def clear_y_plot_limit(which: str = "both") -> None:
+    plot_limits = st.session_state["CellCycling_plot_limits"]
+    if which == "y":
+        plot_limits["y"] = [None, None]
+    elif which == "y2":
+        plot_limits["y2"] = [None, None]
+    elif which == "both":
+        plot_limits["y"] = [None, None]
+        plot_limits["y2"] = [None, None]
+    else:
+        raise RuntimeError
 
 
 # Check if the main page has set up the proper session state variables and check that at
@@ -360,8 +465,8 @@ if enable:
                     with col4:
                         y_position = st.slider(
                             "Y position",
-                            min_value=float(plot_limits["y"][0]),
-                            max_value=float(plot_limits["y"][1]),
+                            min_value=float(plot_limits["y_annotation_reference"][0]),
+                            max_value=float(plot_limits["y_annotation_reference"][1]),
                             step=0.1,
                         )
 
@@ -405,50 +510,91 @@ if enable:
                         for experiment in container._experiments:
                             experiment.unhide_all_cycles()
 
-            col1, col2 = st.columns([4, 1])
+            col1, col2 = st.columns([3.5, 1])
 
             # Define a small column on the right to hold the plot options
             with col2:
 
-                st.markdown("###### Series selector")
+                with st.expander("Series selector"):
+                    st.markdown("###### Series selector")
 
-                primary_axis_name = st.selectbox(
-                    "Select the dataset for the primary Y axis", Y_OPTIONS
-                )
-                secondary_axis_name = st.selectbox(
-                    "Select the dataset for the secondary Y axis",
-                    [option for option in Y_OPTIONS if option != primary_axis_name],
-                )
+                    primary_axis_name = st.selectbox(
+                        "Select the dataset for the primary Y axis",
+                        Y_OPTIONS,
+                        on_change=clear_y_plot_limit,
+                        # kwargs={"which": "y"},
+                    )
+                    secondary_axis_name = st.selectbox(
+                        "Select the dataset for the secondary Y axis",
+                        [option for option in Y_OPTIONS if option != primary_axis_name],
+                        on_change=clear_y_plot_limit,
+                        # kwargs={"which": "y2"},
+                    )
 
-                y_axis_mode = st.radio(
-                    "Select which Y axis series to show",
-                    ["Both", "Only primary", "Only secondary"],
-                )
+                    y_axis_mode = st.radio(
+                        "Select which Y axis series to show",
+                        ["Both", "Only primary", "Only secondary"],
+                    )
 
-                st.markdown("###### Graph options")
-                primary_axis_marker = st.selectbox(
-                    "Select primary Y axis markers", [m for m in MARKERS.keys()]
-                )
-                secondary_axis_marker = st.selectbox(
-                    "Select secondary Y axis markers",
-                    [m for m in MARKERS.keys() if m != primary_axis_marker],
-                )
+                    volume_is_available = True
+                    for container in available_containers:
+                        for name in container.get_experiment_names:
+                            experiment_id = status.get_index_of(name)
+                            experiment = status[experiment_id]
+                            if experiment.volume is None:
+                                volume_is_available = False
+                                break
 
-                options = []
-                if y_axis_mode == "Only primary":
-                    options = ["Primary", "None"]
-                elif y_axis_mode == "Only secondary":
-                    options = ["Secondary", "None"]
-                else:
-                    options = ["Primary", "Secondary", "None"]
+                    scale_by_volume = st.checkbox(
+                        "Scale values by volume",
+                        value=False,
+                        disabled=not volume_is_available,
+                    )
 
-                which_grid = st.radio("Y-axis grid selector", options=options)
-                font_size = st.number_input(
-                    "Label font size", min_value=4, value=14, key="font_size_comparison"
-                )
-                height = st.number_input(
-                    "Plot height", min_value=10, max_value=2000, value=600, step=10
-                )
+                    area_is_available = True
+                    for container in available_containers:
+                        for name in container.get_experiment_names:
+                            experiment_id = status.get_index_of(name)
+                            experiment = status[experiment_id]
+                            if experiment.area is None:
+                                area_is_available = False
+                                break
+
+                    scale_by_area = st.checkbox(
+                        "Scale values by area", value=False, disabled=not area_is_available
+                    )
+
+                with st.expander("Graph options"):
+                    st.markdown("###### Graph options")
+                    primary_axis_marker = st.selectbox(
+                        "Select primary Y axis markers", [m for m in MARKERS.keys()]
+                    )
+                    secondary_axis_marker = st.selectbox(
+                        "Select secondary Y axis markers",
+                        [m for m in MARKERS.keys() if m != primary_axis_marker],
+                    )
+
+                    marker_size = int(
+                        st.number_input("Marker size", min_value=1, value=8, step=1)
+                    )
+
+                    marker_with_border = st.checkbox("Marker with border")
+
+                    options = []
+                    if y_axis_mode == "Only primary":
+                        options = ["Primary", "None"]
+                    elif y_axis_mode == "Only secondary":
+                        options = ["Secondary", "None"]
+                    else:
+                        options = ["Primary", "Secondary", "None"]
+
+                    which_grid = st.radio("Y-axis grid selector", options=options)
+                    font_size = st.number_input(
+                        "Label font size", min_value=4, value=14, key="font_size_comparison"
+                    )
+                    height = st.number_input(
+                        "Plot height", min_value=10, max_value=2000, value=600, step=10
+                    )
 
             with col1:
 
@@ -464,13 +610,21 @@ if enable:
                     # Iterate over each cell_cycling object in the container
                     for cycling_index, (name, cellcycling) in enumerate(container):
 
+                        experiment = status[status.get_index_of(name)]
+                        volume = experiment.volume if scale_by_volume else None
+                        area = experiment.area if scale_by_area else None
+
                         if cycling_index != 0:
                             offset += container.max_cycles_numbers[cycling_index - 1] + 1
 
                         cycle_index = [n + offset for n in cellcycling.numbers]
 
-                        primary_axis = get_data_series(primary_axis_name, cellcycling)
-                        secondary_axis = get_data_series(secondary_axis_name, cellcycling)
+                        primary_label, primary_axis = get_data_series(
+                            primary_axis_name, cellcycling, volume=volume, area=area
+                        )
+                        secondary_label, secondary_axis = get_data_series(
+                            secondary_axis_name, cellcycling, volume=volume, area=area
+                        )
 
                         primary_marker = MARKERS[primary_axis_marker]
                         secondary_marker = MARKERS[secondary_axis_marker]
@@ -483,6 +637,12 @@ if enable:
                                     name=container.name,
                                     mode="markers",
                                     marker_symbol=primary_marker,
+                                    marker=dict(
+                                        size=marker_size,
+                                        line=dict(width=1, color="DarkSlateGrey")
+                                        if marker_with_border
+                                        else None,
+                                    ),
                                     line=dict(color=container.hex_color),
                                     showlegend=True if cycling_index == 0 else False,
                                 ),
@@ -497,6 +657,12 @@ if enable:
                                     name=container.name,
                                     mode="markers",
                                     marker_symbol=secondary_marker,
+                                    marker=dict(
+                                        size=marker_size,
+                                        line=dict(width=1, color="DarkSlateGrey")
+                                        if marker_with_border
+                                        else None,
+                                    ),
                                     line=dict(color=container.hex_color),
                                     showlegend=True
                                     if y_axis_mode == "Only secondary"
@@ -526,19 +692,22 @@ if enable:
                     gridwidth=1,
                     gridcolor="#DDDDDD",
                 )
+
                 fig.update_yaxes(
-                    title_text=primary_axis_name,
+                    title_text=f"{primary_axis_marker}  {primary_label}",
                     # color=primary_axis_color,
                     secondary_y=False,
+                    range=plot_limits["y"],
                     showline=True,
                     linecolor="black",
                     gridwidth=1,
                     gridcolor="#DDDDDD" if which_grid == "Primary" else None,
                 )
                 fig.update_yaxes(
-                    title_text=secondary_axis_name,
+                    title_text=f"{secondary_axis_marker}  {secondary_label}",
                     # color=secondary_axis_color,
                     secondary_y=True,
+                    range=plot_limits["y2"],
                     showline=True,
                     linecolor="black",
                     gridwidth=1,
@@ -603,45 +772,103 @@ if enable:
                 xrange = figure_data.layout.xaxis.range
                 yrange = figure_data.layout.yaxis.range
 
-                if yrange is None:
-                    yrange = figure_data.layout.yaxis2.range
+                y2range = (
+                    figure_data.layout.yaxis2.range
+                    if hasattr(figure_data.layout, "yaxis2")
+                    else None
+                )
 
-                if plot_limits["x"] != xrange or plot_limits["y"] != yrange:
+                if (
+                    plot_limits["x"] != xrange
+                    or plot_limits["y"] != yrange
+                    or plot_limits["y2"] != y2range
+                ):
                     plot_limits["x"] = xrange
-                    plot_limits["y"] = yrange
+                    plot_limits["y"] = yrange if yrange is not None else plot_limits["y"]
+                    plot_limits["y2"] = (
+                        y2range if y2range is not None else plot_limits["y2"]
+                    )
+                    plot_limits["y_annotation_reference"] = (
+                        yrange if yrange is not None else y2range
+                    )
                     st.experimental_rerun()
 
             with col2:
 
+                with st.expander("Y axis range"):
+
+                    figure_data = fig.full_figure_for_development(warn=False)
+
+                    if y_axis_mode != "Only secondary":
+                        st.markdown("###### primary Y-axis range")
+                        y1_range = figure_data.layout.yaxis.range
+                        y1_max = st.number_input(
+                            "Maximum y-value",
+                            key="y_max_prim",
+                            value=plot_limits["y"][1],
+                        )
+                        y1_min = st.number_input(
+                            "Minimum y-value",
+                            key="y_min_prim",
+                            value=plot_limits["y"][0],
+                        )
+
+                        if plot_limits["y"][0] != y1_min or plot_limits["y"][1] != y1_max:
+                            plot_limits["y"] = [y1_min, y1_max]
+                            st.experimental_rerun()
+
+                    if y_axis_mode != "Only primary":
+                        st.markdown("###### secondary Y-axis range")
+                        y2_range = figure_data.layout.yaxis2.range
+                        y2_max = st.number_input(
+                            "Maximum y-value",
+                            key="y_max_sec",
+                            value=plot_limits["y2"][1],
+                        )
+                        y2_min = st.number_input(
+                            "Minimum y-value",
+                            key="y_min_sec",
+                            value=plot_limits["y2"][0],
+                        )
+
+                        if plot_limits["y2"][0] != y2_min or plot_limits["y2"][1] != y2_max:
+                            plot_limits["y2"] = [y2_min, y2_max]
+                            st.experimental_rerun()
+
                 # Add an export option
-                st.markdown("###### Export")
-                format = st.selectbox(
-                    "Select the format of the file", ["png", "jpeg", "svg", "pdf"]
-                )
+                with st.expander("Export"):
+                    st.markdown("###### Export")
+                    format = st.selectbox(
+                        "Select the format of the file", ["png", "jpeg", "svg", "pdf"]
+                    )
 
-                width = st.number_input(
-                    "Plot width",
-                    min_value=10,
-                    max_value=4000,
-                    value=1000,
-                )
+                    width = st.number_input(
+                        "Plot width",
+                        min_value=10,
+                        max_value=4000,
+                        value=1000,
+                    )
 
-                # Redefine layout options to account for user selected width
-                fig.update_layout(
-                    height=height,
-                    width=width,
-                    font=dict(size=font_size),
-                    legend=dict(
-                        orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5
-                    ),
-                    plot_bgcolor="#FFFFFF",
-                )
+                    # Redefine layout options to account for user selected width
+                    fig.update_layout(
+                        height=height,
+                        width=width,
+                        font=dict(size=font_size),
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=1.0,
+                            xanchor="center",
+                            x=0.5,
+                        ),
+                        plot_bgcolor="#FFFFFF",
+                    )
 
-                st.download_button(
-                    "Download plot",
-                    data=fig.to_image(format=format),
-                    file_name=f"cycle_plot.{format}",
-                )
+                    st.download_button(
+                        "Download plot",
+                        data=fig.to_image(format=format),
+                        file_name=f"cycle_plot.{format}",
+                    )
 
         else:
             st.info(
