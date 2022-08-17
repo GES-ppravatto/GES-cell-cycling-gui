@@ -95,23 +95,86 @@ Y_OPTIONS = [
     "Columbic efficiency",
     "Energy efficiency",
     "Voltaic Efficiency",
+    "Total energy - Discharge",
+    "Total capacity - Discharge",
 ]
 
 
 # Define a function to exracte the wanted dataset from a cellcycling experiment give the label
-def get_data_series(option: str, cellcycling: CellCycling) -> List[float]:
+def get_data_series(
+    option: str,
+    cellcycling: CellCycling,
+    volume: Union[float, None] = None,
+    area: Union[float, None] = None,
+) -> Tuple[str, List[float]]:
 
     if option not in Y_OPTIONS:
         raise TypeError
 
+    if volume is not None and volume <= 0:
+        raise ValueError
+
     if option == "Capacity retention":
-        return cellcycling.capacity_retention
+        return "Capacity retention (%)", cellcycling.capacity_retention
     elif option == "Columbic efficiency":
-        return cellcycling.coulomb_efficiencies
+        return "Columbic efficiency (%)", cellcycling.coulomb_efficiencies
     elif option == "Energy efficiency":
-        return cellcycling.energy_efficiencies
+        return "Energy efficiency (%)", cellcycling.energy_efficiencies
     elif option == "Voltaic Efficiency":
-        return cellcycling.voltage_efficiencies
+        return "Voltaic Efficiency (%)", cellcycling.voltage_efficiencies
+    elif option == "Total energy - Discharge":
+        total_energies = [cycle.discharge.total_energy for cycle in cellcycling]
+        if volume is None and area is None:
+            return "discharge total energy (mWh)", total_energies
+        elif volume is not None and area is None:
+            normalized_energies = [energy / (1000 * volume) for energy in total_energies]
+            return "normalized discharge total energy (Wh/L)", normalized_energies
+        elif volume is None and area is not None:
+            normalized_energies = [energy / (1000 * area) for energy in total_energies]
+            return (
+                "normalized discharge total energy (Wh/cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        elif volume is not None and area is not None:
+            normalized_energies = [
+                energy / (1000 * volume * area) for energy in total_energies
+            ]
+            return (
+                "normalized discharge total energy (Wh/L cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        else:
+            raise RuntimeError
+
+    elif option == "Total capacity - Discharge":
+        total_capacities = [cycle.discharge.capacity for cycle in cellcycling]
+
+        if volume is None and area is None:
+            return "discharge total capacity (mAh)", total_capacities
+        elif volume is not None and area is None:
+            normalized_energies = [
+                capacity / (1000 * volume) for capacity in total_capacities
+            ]
+            return "normalized discharge total capacity (Ah/L)", normalized_energies
+        elif volume is None and area is not None:
+            normalized_energies = [
+                capacity / (1000 * area) for capacity in total_capacities
+            ]
+            return (
+                "normalized discharge total capacity (Ah/cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        elif volume is not None and area is not None:
+            normalized_energies = [
+                capacity / (1000 * volume * area) for capacity in total_capacities
+            ]
+            return (
+                "normalized discharge total capacity (Ah/L cm<sup>2</sup>)",
+                normalized_energies,
+            )
+        else:
+            raise RuntimeError
+            
     else:
         raise RuntimeError
 
@@ -431,6 +494,32 @@ if enable:
                         ["Both", "Only primary", "Only secondary"],
                     )
 
+                    volume_is_available = True
+                    for container in available_containers:
+                        for name in container.get_experiment_names:
+                            experiment_id = status.get_index_of(name)
+                            experiment = status[experiment_id]
+                            if experiment.volume is None:
+                                volume_is_available = False
+                                break
+
+                    scale_by_volume = st.checkbox(
+                        "Scale values by volume", value=False, disabled=not volume_is_available
+                    )
+
+                    area_is_available = True
+                    for container in available_containers:
+                        for name in container.get_experiment_names:
+                            experiment_id = status.get_index_of(name)
+                            experiment = status[experiment_id]
+                            if experiment.area is None:
+                                area_is_available = False
+                                break
+
+                    scale_by_area = st.checkbox(
+                        "Scale values by area", value=False, disabled=not area_is_available
+                    )
+
                 with st.expander("Graph options"):
                     st.markdown("###### Graph options")
                     primary_axis_marker = st.selectbox(
@@ -473,13 +562,21 @@ if enable:
                     # Iterate over each cell_cycling object in the container
                     for cycling_index, (name, cellcycling) in enumerate(container):
 
+                        experiment = status[status.get_index_of(name)]
+                        volume = experiment.volume if scale_by_volume else None
+                        area = experiment.area if scale_by_area else None
+
                         if cycling_index != 0:
                             offset += container.max_cycles_numbers[cycling_index - 1] + 1
 
                         cycle_index = [n + offset for n in cellcycling.numbers]
 
-                        primary_axis = get_data_series(primary_axis_name, cellcycling)
-                        secondary_axis = get_data_series(secondary_axis_name, cellcycling)
+                        primary_label, primary_axis = get_data_series(
+                            primary_axis_name, cellcycling, volume=volume, area=area
+                        )
+                        secondary_label, secondary_axis = get_data_series(
+                            secondary_axis_name, cellcycling, volume=volume, area=area
+                        )
 
                         primary_marker = MARKERS[primary_axis_marker]
                         secondary_marker = MARKERS[secondary_axis_marker]
@@ -539,7 +636,7 @@ if enable:
                 )
 
                 fig.update_yaxes(
-                    title_text=primary_axis_name,
+                    title_text=primary_label,
                     # color=primary_axis_color,
                     secondary_y=False,
                     range=plot_limits["y"],
@@ -549,7 +646,7 @@ if enable:
                     gridcolor="#DDDDDD" if which_grid == "Primary" else None,
                 )
                 fig.update_yaxes(
-                    title_text=secondary_axis_name,
+                    title_text=secondary_label,
                     # color=secondary_axis_color,
                     secondary_y=True,
                     range=plot_limits["y2"],
@@ -616,13 +713,11 @@ if enable:
                 # Evaluate the current plot limits
                 xrange = figure_data.layout.xaxis.range
                 yrange = figure_data.layout.yaxis.range
-                y2range = figure_data.layout.yaxis2.range
 
-                if (
-                    plot_limits["x"] != xrange
-                    or plot_limits["y"] != yrange
-                    or plot_limits["y2"] != y2range
-                ):
+                if yrange is None:
+                    yrange = figure_data.layout.yaxis2.range
+
+                if plot_limits["x"] != xrange or plot_limits["y"] != yrange:
                     plot_limits["x"] = xrange
                     plot_limits["y"] = yrange if yrange is not None else plot_limits["y"]
                     plot_limits["y2"] = (

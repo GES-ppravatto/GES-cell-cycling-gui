@@ -218,7 +218,7 @@ with manipulation_tab:
                 st.session_state["SelectedExperimentName"] = new_experiment_name
                 st.experimental_rerun()
 
-            # Allow the user to re-define the experiment volume
+            # Allow the user to define the experiment volume
             st.markdown("##### Electrolite volume:")
             volume_str = st.text_input(
                 "Volume of the electrolyte (L)",
@@ -237,6 +237,27 @@ with manipulation_tab:
                 else:
                     if volume != experiment.volume:
                         experiment.volume = volume
+                        st.experimental_rerun()
+
+            # Allow the user to define the experiment electrode area
+            st.markdown("##### Electrode area:")
+            area_str = st.text_input(
+                "Area of the electrode (cm^2)",
+                value="" if experiment.area is None else str(experiment.area),
+                help="""If set for all the experiments, it unlocks the options 
+                of examining the data in terms of the current density""",
+            )
+
+            if area_str != "":
+                try:
+                    area = float(area_str)
+                except Exception:
+                    st.error(
+                        f"ERROR: the input '{area_str}' does not represent a valid floating point value"
+                    )
+                else:
+                    if area != experiment.area:
+                        experiment.area = area
                         st.experimental_rerun()
 
         with col2:

@@ -282,6 +282,9 @@ class Experiment:
         _volume : float
             volume in liters associated to the experiment. Useful in the computation of
             volumetrical properties
+        _area : float
+            area in squared centimeters associated to the experiment. Useful in the 
+            computation of surface related properties
         _skipped_files : int
             counter of the number of files skipped during the parsing process
 
@@ -344,6 +347,7 @@ class Experiment:
 
         # Set other class values
         self._volume = None  # Volume of the electrolite in liters
+        self._area = None  # Volume of the electrolite in liters
         self._skipped_files = 0
 
     def _update_cycles_based_objects(self) -> None:
@@ -450,6 +454,22 @@ class Experiment:
         if type(value) != float or value <= 0:
             raise ValueError
         self._volume = value
+    
+    @property
+    def area(self) -> float:
+        """
+        getter of the area associated to the experiment
+        """
+        return self._area
+
+    @area.setter
+    def area(self, value: float) -> None:
+        """
+        setter of the area associated to the experiment
+        """
+        if type(value) != float or value <= 0:
+            raise ValueError
+        self._area = value
 
     @property
     def color(self) -> ColorRGB:
