@@ -778,10 +778,12 @@ if enable:
                     else None
                 )
 
+                # Update the axis ranges if a change is detected. Exclude the axis not currently
+                # plotted to avoid continuous rerun of the page
                 if (
                     plot_limits["x"] != xrange
-                    or plot_limits["y"] != yrange
-                    or plot_limits["y2"] != y2range
+                    or (plot_limits["y"] != yrange and y_axis_mode != "Only secondary")
+                    or (plot_limits["y2"] != y2range and y_axis_mode != "Only primary")
                 ):
                     plot_limits["x"] = xrange
                     plot_limits["y"] = yrange if yrange is not None else plot_limits["y"]
