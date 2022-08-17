@@ -679,7 +679,7 @@ if enable:
                         break
 
                 scale_by_area = st.checkbox(
-                    "Scale values by area", value=False, disabled=not area_is_available
+                    "Scale values by area", value=False, disabled=not area_is_available, key="by_area_comparison"
                 )
 
                 st.markdown("###### Aspect")
@@ -734,10 +734,10 @@ if enable:
                     if cycle.discharge is not None:
 
                         x_label, x_series = get_halfcycle_series(
-                            cycle.discharge, x_axis, volume
+                            cycle.discharge, x_axis, volume, area
                         )
                         y_label, y_series = get_halfcycle_series(
-                            cycle.discharge, y_axis, volume
+                            cycle.discharge, y_axis, volume, area
                         )
 
                         fig.add_trace(
