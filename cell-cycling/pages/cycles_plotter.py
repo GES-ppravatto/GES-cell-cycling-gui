@@ -25,12 +25,16 @@ HALFCYCLE_SERIES = [
     "voltage",
     "current",
     "charge",
+    "power",
     "energy",
 ]
 
 
 def get_halfcycle_series(
-    halfcycle: HalfCycle, title: str, volume: Union[None, float]
+    halfcycle: HalfCycle,
+    title: str,
+    volume: Union[None, float] = None,
+    area: Union[None, float] = None,
 ) -> Tuple[str, pd.Series]:
     """
     Given the halfcycle of interest and the title of the data series, retuns the pandas
@@ -44,25 +48,68 @@ def get_halfcycle_series(
             the title of the series to be taken from the halfcycle. Note that the title
             must match one of the entries of the HALFCYCLE_SERIES list variable.
         volume: Union[None, float]
-            if not None will return a custom label together with the volumetric property (if
-            relevant)
+            if not None will trigger the normalization of current, charge and energy per unit area
+        area: Union[None, float]
+            if not None will trigger the normalization of current, charge and energy per unit area
     """
     if title == "time":
         return "time (s)", halfcycle.time
+
     elif title == "voltage":
         return "voltage (V)", halfcycle.voltage
+
     elif title == "current":
-        return "current (A)", halfcycle.current
+        current = halfcycle.current
+        if volume is None and area is None:
+            return "current (A)", current
+        elif volume is not None and area is None:
+            return "normalized current (A/L)", current / volume
+        elif area is not None and volume is None:
+            return "normalized current (A/cm<sup>2</sup>)", current / area
+        elif area is not None and volume is not None:
+            return "normalized current (A/L cm<sup>2</sup>)", current / (volume * area)
+        else:
+            raise RuntimeError
+
     elif title == "charge":
-        if volume is not None:
-            return "volumic charge (Ah/L)", halfcycle.Q / (1000*volume)
+        charge = halfcycle.Q
+        if volume is None and area is None:
+            return "charge (mAh)", charge
+        elif volume is not None and area is None:
+            return "normalized charge (Ah/L)", charge / (1000 * volume)
+        elif area is not None and volume is None:
+            return "normalized charge (Ah/cm<sup>2</sup>)", charge / (1000 * area)
+        elif area is not None and volume is not None:
+            return "normalized charge (Ah/L cm<sup>2</sup>)", charge / (1000 * volume * area)
         else:
-            return "charge (mAh)", halfcycle.Q
+            raise RuntimeError
+
+    elif title == "power":
+        power = halfcycle.power
+        if volume is None and area is None:
+            return "power (W)", power
+        elif volume is not None and area is None:
+            return "normalized power (W/L)", power / volume
+        elif area is not None and volume is None:
+            return "normalized power (W/cm<sup>2</sup>)", power / area
+        elif area is not None and volume is not None:
+            return "normalized power (W/L cm<sup>2</sup>)", power / (volume * area)
+        else:
+            raise RuntimeError
+
     elif title == "energy":
-        if volume is not None:
-            return "volumic energy (Wh/L)", halfcycle.energy / (1000*volume)
+        energy = halfcycle.energy
+        if volume is None and area is None:
+            return "energy (mWh)", energy
+        elif volume is not None and area is None:
+            return "normalized energy (Wh/L)", energy / (1000 * volume)
+        elif area is not None and volume is None:
+            return "normalized energy (Wh/cm<sup>2</sup>)", energy / (1000 * area)
+        elif area is not None and volume is not None:
+            return "normalized energy (Wh/L cm<sup>2</sup>)", energy / (1000 * volume * area)
         else:
-            return "energy (mWh)", halfcycle.energy
+            raise RuntimeError
+
     else:
         raise ValueError
 
@@ -325,10 +372,6 @@ if enable:
                     disabled=True if len(selected_experiments) == 1 else False,
                 )
 
-                st.markdown("###### Series")
-                show_charge = st.checkbox("Show charge", value=True)
-                show_discharge = st.checkbox("Show discharge", value=True)
-
                 volume_is_available = True
                 for name in selected_experiments.view.keys():
                     experiment_id = status.get_index_of(name)
@@ -340,6 +383,22 @@ if enable:
                 scale_by_volume = st.checkbox(
                     "Scale values by volume", value=False, disabled=not volume_is_available
                 )
+
+                area_is_available = True
+                for name in selected_experiments.view.keys():
+                    experiment_id = status.get_index_of(name)
+                    experiment = status[experiment_id]
+                    if experiment.area is None:
+                        area_is_available = False
+                        break
+
+                scale_by_area = st.checkbox(
+                    "Scale values by area", value=False, disabled=not area_is_available
+                )
+
+                st.markdown("###### Series")
+                show_charge = st.checkbox("Show charge", value=True)
+                show_discharge = st.checkbox("Show discharge", value=True)
 
                 st.markdown("###### Aspect")
                 reverse = st.checkbox("Reversed colorscale", value=True)
@@ -366,6 +425,7 @@ if enable:
                     experiment: Experiment = status[exp_id]
                     cycles = experiment.cycles
                     volume = experiment.volume if scale_by_volume else None
+                    area = experiment.area if scale_by_area else None
 
                     # Get the user selected cycles and plot only the corresponden lines
                     num_traces = len(selected_experiments[name])
@@ -387,10 +447,10 @@ if enable:
                             series_name = selected_experiments.get_label(name, cycle_id)
 
                             x_label, x_series = get_halfcycle_series(
-                                cycle.charge, x_axis, volume
+                                cycle.charge, x_axis, volume, area
                             )
                             y_label, y_series = get_halfcycle_series(
-                                cycle.charge, y_axis, volume
+                                cycle.charge, y_axis, volume, area
                             )
 
                             fig.add_trace(
@@ -410,10 +470,10 @@ if enable:
                             series_name = selected_experiments.get_label(name, cycle_id)
 
                             x_label, x_series = get_halfcycle_series(
-                                cycle.discharge, x_axis, volume
+                                cycle.discharge, x_axis, volume, area
                             )
                             y_label, y_series = get_halfcycle_series(
-                                cycle.discharge, y_axis, volume
+                                cycle.discharge, y_axis, volume, area
                             )
 
                             fig.add_trace(
