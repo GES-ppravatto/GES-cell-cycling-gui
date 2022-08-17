@@ -85,8 +85,8 @@ MARKERS = {
     "■": "square",
     "▲": "triangle-up",
     "▼": "triangle-down",
-    "+": "cross",
-    "X": "x",
+    "🞤": "cross",
+    "🞭": "x",
 }
 
 # Define a list of possible alternatives for the y axis
@@ -550,6 +550,12 @@ if enable:
                         [m for m in MARKERS.keys() if m != primary_axis_marker],
                     )
 
+                    marker_size = int(
+                        st.number_input("Marker size", min_value=1, value=8, step=1)
+                    )
+
+                    marker_with_border = st.checkbox("Marker with border")
+
                     options = []
                     if y_axis_mode == "Only primary":
                         options = ["Primary", "None"]
@@ -564,10 +570,6 @@ if enable:
                     )
                     height = st.number_input(
                         "Plot height", min_value=10, max_value=2000, value=600, step=10
-                    )
-
-                    marker_size = int(
-                        st.number_input("Marker size", min_value=1, value=8, step=1)
                     )
 
             with col1:
@@ -611,7 +613,12 @@ if enable:
                                     name=container.name,
                                     mode="markers",
                                     marker_symbol=primary_marker,
-                                    marker=dict(size=marker_size),
+                                    marker=dict(
+                                        size=marker_size,
+                                        line=dict(width=1, color="DarkSlateGrey")
+                                        if marker_with_border
+                                        else None,
+                                    ),
                                     line=dict(color=container.hex_color),
                                     showlegend=True if cycling_index == 0 else False,
                                 ),
@@ -626,7 +633,12 @@ if enable:
                                     name=container.name,
                                     mode="markers",
                                     marker_symbol=secondary_marker,
-                                    marker=dict(size=marker_size),
+                                    marker=dict(
+                                        size=marker_size,
+                                        line=dict(width=1, color="DarkSlateGrey")
+                                        if marker_with_border
+                                        else None,
+                                    ),
                                     line=dict(color=container.hex_color),
                                     showlegend=True
                                     if y_axis_mode == "Only secondary"
@@ -658,7 +670,7 @@ if enable:
                 )
 
                 fig.update_yaxes(
-                    title_text=primary_label,
+                    title_text=f"{primary_axis_marker}  {primary_label}",
                     # color=primary_axis_color,
                     secondary_y=False,
                     range=plot_limits["y"],
@@ -668,7 +680,7 @@ if enable:
                     gridcolor="#DDDDDD" if which_grid == "Primary" else None,
                 )
                 fig.update_yaxes(
-                    title_text=secondary_label,
+                    title_text=f"{secondary_axis_marker}  {secondary_label}",
                     # color=secondary_axis_color,
                     secondary_y=True,
                     range=plot_limits["y2"],
