@@ -4,80 +4,12 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from streamlit_plotly_events import plotly_events
 
-from core.gui_core import (
-    Experiment,
-    ProgramStatus,
-    get_plotly_color,
-    set_production_page_style,
-)
+from core.gui_core import ProgramStatus, CellcyclingPlotSettings
+from core.experiment import ExperimentContainer
+from core.utils import set_production_page_style
+from core.colors import get_plotly_color
 
 from echemsuite.cellcycling.cycles import CellCycling
-
-# Define an Experiment container to hold all the experiments related to a single multi-parameter
-# cycling experiment
-class ExperimentContainer:
-    def __init__(self, name: str, color: str = None) -> None:
-        self._name = name
-        self._color = color if color is not None else "#000000"
-        self._experiments: List[Experiment] = []
-
-    def __iter__(self) -> Tuple[str, CellCycling]:
-        for experiment in self._experiments:
-            yield experiment.name, experiment.cellcycling
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def get_experiment_names(self) -> List[str]:
-        return [name for name, _ in self]
-
-    @property
-    def hex_color(self) -> str:
-        return self._color
-
-    @property
-    def max_cycles_numbers(self) -> List[int]:
-        numbers = []
-        for _, obj in self:
-            obj.get_numbers()
-            numbers.append(obj._numbers[-1])
-        return numbers
-
-    def add_experiment(self, experiment: Experiment) -> None:
-        if experiment not in self._experiments:
-            self._experiments.append(experiment)
-        else:
-            raise RuntimeError
-
-    def remove_experiment(self, name: str) -> None:
-        if name in [obj.name for obj in self._experiments]:
-            id = [obj.name for obj in self._experiments].index(name)
-            del self._experiments[id]
-        else:
-            raise ValueError
-
-    def clear_experiments(self) -> None:
-        self._experiments = {}
-
-    def hide_cycle(self, cumulative_id: int) -> None:
-        cumulative_sum = []
-        for i, number in enumerate(self.max_cycles_numbers):
-            cumulative_sum.append(number if i == 0 else cumulative_sum[-1] + number + 1)
-
-        experiment_id, cycle_id = None, None
-        for i, threshold in enumerate(cumulative_sum):
-            if cumulative_id <= threshold:
-                experiment_id = i
-                if i == 0:
-                    cycle_id = cumulative_id
-                else:
-                    cycle_id = cumulative_id - cumulative_sum[i - 1] - 1
-                break
-
-        self._experiments[experiment_id].hide_cycle(cycle_id)
-
 
 # Define a dictionary of available markers with their plotly name
 MARKERS = {
@@ -213,6 +145,7 @@ if "ExperimentContainers" not in st.session_state:
         "y_annotation_reference": [None, None],
     }
     st.session_state["PlotAnnotations"] = {}
+    st.session_state["Cellcycling_plot_settings"] = CellcyclingPlotSettings()
 
 
 def clear_y_plot_limit(which: str = "both") -> None:
@@ -259,6 +192,7 @@ if enable:
         "CellCycling_plot_limits"
     ]
     annotation_dict: dict = st.session_state["PlotAnnotations"]
+    plot_settings: CellcyclingPlotSettings = st.session_state["Cellcycling_plot_settings"]
 
     # Define a two tab page with a container editor and a plotter
     container_tab, plot_tab = st.tabs(["Container editor", "Container plotter"])
@@ -425,15 +359,18 @@ if enable:
                     col1, col2 = st.columns(2)
 
                     with col1:
-                        annotation_size = st.number_input(
-                            "Enter the dimension of the annotation font",
-                            min_value=4,
-                            value=12,
+                        plot_settings.annotation_size = int(
+                            st.number_input(
+                                "Enter the dimension of the annotation font",
+                                min_value=4,
+                                value=plot_settings.annotation_size,
+                            )
                         )
 
                     with col2:
-                        annotation_color = st.color_picker(
-                            "Select annotation color", value="#000000"
+                        plot_settings.annotation_color = st.color_picker(
+                            "Select annotation color",
+                            value=plot_settings.annotation_color,
                         )
 
                     # Define and annotation editor in which the user can select the mode of
@@ -459,6 +396,9 @@ if enable:
                             "X position",
                             min_value=float(plot_limits["x"][0]),
                             max_value=float(plot_limits["x"][1]),
+                            value=annotation_dict[annotation][0]
+                            if annotation in annotation_dict
+                            else None,
                             step=0.1,
                         )
 
@@ -467,6 +407,9 @@ if enable:
                             "Y position",
                             min_value=float(plot_limits["y_annotation_reference"][0]),
                             max_value=float(plot_limits["y_annotation_reference"][1]),
+                            value=annotation_dict[annotation][1]
+                            if annotation in annotation_dict
+                            else None,
                             step=0.1,
                         )
 
@@ -518,22 +461,37 @@ if enable:
                 with st.expander("Series selector"):
                     st.markdown("###### Series selector")
 
-                    primary_axis_name = st.selectbox(
+                    plot_settings.primary_axis_name = st.selectbox(
                         "Select the dataset for the primary Y axis",
                         Y_OPTIONS,
+                        index=Y_OPTIONS.index(plot_settings.primary_axis_name)
+                        if plot_settings.primary_axis_name
+                        else 0,
                         on_change=clear_y_plot_limit,
                         # kwargs={"which": "y"},
                     )
-                    secondary_axis_name = st.selectbox(
+
+                    sub_Y_OPTIONS = [
+                        opt for opt in Y_OPTIONS if opt != plot_settings.primary_axis_name
+                    ]
+                    plot_settings.secondary_axis_name = st.selectbox(
                         "Select the dataset for the secondary Y axis",
-                        [option for option in Y_OPTIONS if option != primary_axis_name],
+                        sub_Y_OPTIONS,
+                        index=sub_Y_OPTIONS.index(plot_settings.secondary_axis_name)
+                        if plot_settings.secondary_axis_name
+                        and plot_settings.secondary_axis_name in sub_Y_OPTIONS
+                        else 0,
                         on_change=clear_y_plot_limit,
                         # kwargs={"which": "y2"},
                     )
 
-                    y_axis_mode = st.radio(
+                    Y_MODES = ["Both", "Only primary", "Only secondary"]
+                    plot_settings.y_axis_mode = st.radio(
                         "Select which Y axis series to show",
-                        ["Both", "Only primary", "Only secondary"],
+                        Y_MODES,
+                        index=Y_MODES.index(plot_settings.y_axis_mode)
+                        if plot_settings.y_axis_mode
+                        else 0,
                     )
 
                     volume_is_available = True
@@ -545,9 +503,11 @@ if enable:
                                 volume_is_available = False
                                 break
 
-                    scale_by_volume = st.checkbox(
+                    plot_settings.scale_by_volume = st.checkbox(
                         "Scale values by volume",
-                        value=False,
+                        value=plot_settings.scale_by_volume
+                        if volume_is_available
+                        else False,
                         disabled=not volume_is_available,
                     )
 
@@ -560,40 +520,80 @@ if enable:
                                 area_is_available = False
                                 break
 
-                    scale_by_area = st.checkbox(
-                        "Scale values by area", value=False, disabled=not area_is_available
+                    plot_settings.scale_by_area = st.checkbox(
+                        "Scale values by area",
+                        value=plot_settings.scale_by_area if area_is_available else False,
+                        disabled=not area_is_available,
                     )
 
                 with st.expander("Graph options"):
                     st.markdown("###### Graph options")
-                    primary_axis_marker = st.selectbox(
-                        "Select primary Y axis markers", [m for m in MARKERS.keys()]
+
+                    available_MARKERS = [m for m in MARKERS.keys()]
+                    plot_settings.primary_axis_marker = st.selectbox(
+                        "Select primary Y axis markers",
+                        available_MARKERS,
+                        index=available_MARKERS.index(plot_settings.primary_axis_marker)
+                        if plot_settings.primary_axis_marker
+                        else 0,
                     )
-                    secondary_axis_marker = st.selectbox(
+
+                    available_MARKERS = [
+                        m for m in MARKERS.keys() if m != plot_settings.primary_axis_marker
+                    ]
+                    plot_settings.secondary_axis_marker = st.selectbox(
                         "Select secondary Y axis markers",
-                        [m for m in MARKERS.keys() if m != primary_axis_marker],
+                        available_MARKERS,
+                        index=available_MARKERS.index(plot_settings.secondary_axis_marker)
+                        if plot_settings.secondary_axis_marker
+                        and plot_settings.secondary_axis_marker in available_MARKERS
+                        else 0,
                     )
 
-                    marker_size = int(
-                        st.number_input("Marker size", min_value=1, value=8, step=1)
+                    plot_settings.marker_size = int(
+                        st.number_input(
+                            "Marker size",
+                            min_value=1,
+                            value=plot_settings.marker_size,
+                            step=1,
+                        )
                     )
 
-                    marker_with_border = st.checkbox("Marker with border")
+                    plot_settings.marker_with_border = st.checkbox(
+                        "Marker with border", value=plot_settings.marker_with_border
+                    )
 
                     options = []
-                    if y_axis_mode == "Only primary":
+                    if plot_settings.y_axis_mode == "Only primary":
                         options = ["Primary", "None"]
-                    elif y_axis_mode == "Only secondary":
+                    elif plot_settings.y_axis_mode == "Only secondary":
                         options = ["Secondary", "None"]
                     else:
                         options = ["Primary", "Secondary", "None"]
 
-                    which_grid = st.radio("Y-axis grid selector", options=options)
-                    font_size = st.number_input(
-                        "Label font size", min_value=4, value=14, key="font_size_comparison"
+                    plot_settings.which_grid = st.radio(
+                        "Y-axis grid selector",
+                        options=options,
+                        index=options.index(plot_settings.which_grid)
+                        if plot_settings.which_grid and plot_settings.which_grid in options
+                        else 0,
                     )
-                    height = st.number_input(
-                        "Plot height", min_value=10, max_value=2000, value=600, step=10
+                    plot_settings.font_size = int(
+                        st.number_input(
+                            "Label font size",
+                            min_value=4,
+                            value=plot_settings.font_size,
+                            key="font_size_comparison",
+                        )
+                    )
+                    plot_settings.height = int(
+                        st.number_input(
+                            "Plot height",
+                            min_value=10,
+                            max_value=2000,
+                            value=plot_settings.height,
+                            step=10,
+                        )
                     )
 
             with col1:
@@ -611,8 +611,10 @@ if enable:
                     for cycling_index, (name, cellcycling) in enumerate(container):
 
                         experiment = status[status.get_index_of(name)]
-                        volume = experiment.volume if scale_by_volume else None
-                        area = experiment.area if scale_by_area else None
+                        volume = (
+                            experiment.volume if plot_settings.scale_by_volume else None
+                        )
+                        area = experiment.area if plot_settings.scale_by_area else None
 
                         if cycling_index != 0:
                             offset += container.max_cycles_numbers[cycling_index - 1] + 1
@@ -620,16 +622,22 @@ if enable:
                         cycle_index = [n + offset for n in cellcycling.numbers]
 
                         primary_label, primary_axis = get_data_series(
-                            primary_axis_name, cellcycling, volume=volume, area=area
+                            plot_settings.primary_axis_name,
+                            cellcycling,
+                            volume=volume,
+                            area=area,
                         )
                         secondary_label, secondary_axis = get_data_series(
-                            secondary_axis_name, cellcycling, volume=volume, area=area
+                            plot_settings.secondary_axis_name,
+                            cellcycling,
+                            volume=volume,
+                            area=area,
                         )
 
-                        primary_marker = MARKERS[primary_axis_marker]
-                        secondary_marker = MARKERS[secondary_axis_marker]
+                        primary_marker = MARKERS[plot_settings.primary_axis_marker]
+                        secondary_marker = MARKERS[plot_settings.secondary_axis_marker]
 
-                        if y_axis_mode != "Only secondary":
+                        if plot_settings.y_axis_mode != "Only secondary":
                             fig.add_trace(
                                 go.Scatter(
                                     x=cycle_index,
@@ -638,9 +646,9 @@ if enable:
                                     mode="markers",
                                     marker_symbol=primary_marker,
                                     marker=dict(
-                                        size=marker_size,
+                                        size=plot_settings.marker_size,
                                         line=dict(width=1, color="DarkSlateGrey")
-                                        if marker_with_border
+                                        if plot_settings.marker_with_border
                                         else None,
                                     ),
                                     line=dict(color=container.hex_color),
@@ -649,7 +657,7 @@ if enable:
                                 secondary_y=False,
                             )
 
-                        if y_axis_mode != "Only primary":
+                        if plot_settings.y_axis_mode != "Only primary":
                             fig.add_trace(
                                 go.Scatter(
                                     x=cycle_index,
@@ -658,14 +666,14 @@ if enable:
                                     mode="markers",
                                     marker_symbol=secondary_marker,
                                     marker=dict(
-                                        size=marker_size,
+                                        size=plot_settings.marker_size,
                                         line=dict(width=1, color="DarkSlateGrey")
-                                        if marker_with_border
+                                        if plot_settings.marker_with_border
                                         else None,
                                     ),
                                     line=dict(color=container.hex_color),
                                     showlegend=True
-                                    if y_axis_mode == "Only secondary"
+                                    if plot_settings.y_axis_mode == "Only secondary"
                                     and cycling_index == 0
                                     else False,
                                 ),
@@ -679,8 +687,8 @@ if enable:
                             x=position[0],
                             y=position[1],
                             text=text,
-                            font_size=annotation_size,
-                            font_color=annotation_color,
+                            font_size=plot_settings.annotation_size,
+                            font_color=plot_settings.annotation_color,
                             showarrow=False,
                         )
 
@@ -694,29 +702,31 @@ if enable:
                 )
 
                 fig.update_yaxes(
-                    title_text=f"{primary_axis_marker}  {primary_label}",
+                    title_text=f"{plot_settings.primary_axis_marker}  {primary_label}",
                     # color=primary_axis_color,
                     secondary_y=False,
                     range=plot_limits["y"],
                     showline=True,
                     linecolor="black",
                     gridwidth=1,
-                    gridcolor="#DDDDDD" if which_grid == "Primary" else None,
+                    gridcolor="#DDDDDD" if plot_settings.which_grid == "Primary" else None,
                 )
                 fig.update_yaxes(
-                    title_text=f"{secondary_axis_marker}  {secondary_label}",
+                    title_text=f"{plot_settings.secondary_axis_marker}  {secondary_label}",
                     # color=secondary_axis_color,
                     secondary_y=True,
                     range=plot_limits["y2"],
                     showline=True,
                     linecolor="black",
                     gridwidth=1,
-                    gridcolor="#DDDDDD" if which_grid == "Secondary" else None,
+                    gridcolor="#DDDDDD"
+                    if plot_settings.which_grid == "Secondary"
+                    else None,
                 )
 
                 # Apply proper formatting to legend and plot background
                 fig.update_layout(
-                    font=dict(size=font_size),
+                    font=dict(size=plot_settings.font_size),
                     legend=dict(
                         orientation="h", yanchor="bottom", y=1.0, xanchor="center", x=0.5
                     ),
@@ -726,7 +736,10 @@ if enable:
                 # Use the plotly event widget to allow for interactive selection of points
                 # on the plot
                 selected_points = plotly_events(
-                    fig, click_event=False, select_event=True, override_height=height
+                    fig,
+                    click_event=False,
+                    select_event=True,
+                    override_height=plot_settings.height,
                 )
 
                 # Get the figure data to localize the selected points and to get the plot limits
@@ -782,8 +795,14 @@ if enable:
                 # plotted to avoid continuous rerun of the page
                 if (
                     plot_limits["x"] != xrange
-                    or (plot_limits["y"] != yrange and y_axis_mode != "Only secondary")
-                    or (plot_limits["y2"] != y2range and y_axis_mode != "Only primary")
+                    or (
+                        plot_limits["y"] != yrange
+                        and plot_settings.y_axis_mode != "Only secondary"
+                    )
+                    or (
+                        plot_limits["y2"] != y2range
+                        and plot_settings.y_axis_mode != "Only primary"
+                    )
                 ):
                     plot_limits["x"] = xrange
                     plot_limits["y"] = yrange if yrange is not None else plot_limits["y"]
@@ -801,7 +820,7 @@ if enable:
 
                     figure_data = fig.full_figure_for_development(warn=False)
 
-                    if y_axis_mode != "Only secondary":
+                    if plot_settings.y_axis_mode != "Only secondary":
                         st.markdown("###### primary Y-axis range")
                         y1_range = figure_data.layout.yaxis.range
                         y1_max = st.number_input(
@@ -819,7 +838,7 @@ if enable:
                             plot_limits["y"] = [y1_min, y1_max]
                             st.experimental_rerun()
 
-                    if y_axis_mode != "Only primary":
+                    if plot_settings.y_axis_mode != "Only primary":
                         st.markdown("###### secondary Y-axis range")
                         y2_range = figure_data.layout.yaxis2.range
                         y2_max = st.number_input(
@@ -840,22 +859,30 @@ if enable:
                 # Add an export option
                 with st.expander("Export"):
                     st.markdown("###### Export")
-                    format = st.selectbox(
-                        "Select the format of the file", ["png", "jpeg", "svg", "pdf"]
+
+                    available_formats = ["png", "jpeg", "svg", "pdf"]
+                    plot_settings.format = st.selectbox(
+                        "Select the format of the file",
+                        available_formats,
+                        index=available_formats.index(plot_settings.format)
+                        if plot_settings.format
+                        else 0,
                     )
 
-                    width = st.number_input(
-                        "Plot width",
-                        min_value=10,
-                        max_value=4000,
-                        value=1000,
+                    plot_settings.width = int(
+                        st.number_input(
+                            "Plot width",
+                            min_value=10,
+                            max_value=4000,
+                            value=plot_settings.width,
+                        )
                     )
 
                     # Redefine layout options to account for user selected width
                     fig.update_layout(
-                        height=height,
-                        width=width,
-                        font=dict(size=font_size),
+                        height=plot_settings.height,
+                        width=plot_settings.width,
+                        font=dict(size=plot_settings.font_size),
                         legend=dict(
                             orientation="h",
                             yanchor="bottom",
@@ -868,8 +895,8 @@ if enable:
 
                     st.download_button(
                         "Download plot",
-                        data=fig.to_image(format=format),
-                        file_name=f"cycle_plot.{format}",
+                        data=fig.to_image(format=plot_settings.format),
+                        file_name=f"cycle_plot.{plot_settings.format}",
                     )
 
         else:
