@@ -1,15 +1,12 @@
 import streamlit as st
 import pandas as pd
+from io import BytesIO
 
-from core.gui_core import (
-    ColorRGB,
-    Experiment,
-    ProgramStatus,
-    _EXPERIMENT_INIT_COUNTER_,
-    RGB_to_HEX,
-    HEX_to_RGB,
-    set_production_page_style,
-)
+from core.session_state_manager import save_session_state, load_session_state
+from core.gui_core import ProgramStatus
+from core.colors import ColorRGB, RGB_to_HEX, HEX_to_RGB
+from core.experiment import Experiment, _EXPERIMENT_INIT_COUNTER_
+from core.utils import set_production_page_style
 
 if "ProgramStatus" not in st.session_state:
     st.session_state["ProgramStatus"] = ProgramStatus()
@@ -22,8 +19,9 @@ set_production_page_style()
 
 st.title("Experiment file manager")
 
-upload_tab, manipulation_tab, inspector_tab = st.tabs(["Upload", "Edit", "Inspect"])
-
+upload_tab, manipulation_tab, inspector_tab, save_tab = st.tabs(
+    ["Upload", "Edit", "Inspect", "💾 save/load"]
+)
 
 with upload_tab:
 
@@ -600,3 +598,40 @@ with inspector_tab:
         with st.expander("Cycles report after parsing:", expanded=True):
             st.markdown("**Cycles report:**")
             st.table(df)
+
+with save_tab:
+
+    st.markdown("### Session save/load:")
+    st.write("In this tab you can save and load the state of the whole analysis.")
+
+    csave, cload = st.columns(2)
+
+    with csave:
+        st.markdown("##### Save session")
+
+        picklename = st.text_input(
+            "Enter the name of the file to save", value="my_analysis"
+        )
+
+        st.download_button(
+            label="💾 Save status",
+            data=save_session_state(),
+            file_name=f"{picklename}.pickle",
+        )
+
+    with cload:
+
+        st.markdown("##### Load session")
+
+        with st.form("Load", clear_on_submit=True):
+
+            source = st.file_uploader(
+                "Select the file", accept_multiple_files=False, type="pickle"
+            )
+
+            submitted = st.form_submit_button("Submit")
+
+        # If the button has been pressed and the file list is not empty load the files in the experiment
+        if submitted and source:
+            load_session_state(BytesIO(source.getvalue()))
+            st.experimental_rerun()

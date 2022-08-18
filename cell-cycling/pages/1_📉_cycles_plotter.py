@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import List, Tuple, Union
 import math
 import streamlit as st
@@ -7,14 +8,15 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from core.gui_core import (
-    Experiment,
     ProgramStatus,
     ExperimentSelector,
     SingleCycleSeries,
-    RGB_to_HEX,
-    get_plotly_color,
-    set_production_page_style,
+    StackedPlotSettings,
+    ComparisonPlotSettings,
 )
+from core.experiment import Experiment
+from core.utils import set_production_page_style
+from core.colors import get_plotly_color, RGB_to_HEX
 from echemsuite.cellcycling.cycles import HalfCycle
 
 
@@ -132,20 +134,24 @@ else:
 
 # Create an instance of the ExperimentSelector class to be used to define the data to plot
 # and chache it in the session state
-if "CyclePlotSelection" not in st.session_state:
-    st.session_state["CyclePlotSelection"] = ExperimentSelector()
-    st.session_state["ManualSelectorBuffer"] = []
-    st.session_state["ComparisonPlot"] = []
+if "Page2_CyclePlotSelection" not in st.session_state:
+    st.session_state["Page2_CyclePlotSelection"] = ExperimentSelector()
+    st.session_state["Page2_ManualSelectorBuffer"] = []
+    st.session_state["Page2_ComparisonPlot"] = []
+    st.session_state["Page2_stacked_settings"] = StackedPlotSettings()
+    st.session_state["Page2_comparison_settings"] = ComparisonPlotSettings()
 
 
 def clean_manual_selection_buffer():
-    st.session_state["ManualSelectorBuffer"] = []
+    st.session_state["Page2_ManualSelectorBuffer"] = []
 
 
 # Fetch a fresh instance of the Progam Status and Experiment Selection variables from the session state
 status: ProgramStatus = st.session_state["ProgramStatus"]
-selected_experiments: ExperimentSelector = st.session_state["CyclePlotSelection"]
-selected_series: List[SingleCycleSeries] = st.session_state["ComparisonPlot"]
+selected_experiments: ExperimentSelector = st.session_state["Page2_CyclePlotSelection"]
+selected_series: List[SingleCycleSeries] = st.session_state["Page2_ComparisonPlot"]
+stacked_settings: StackedPlotSettings = st.session_state["Page2_stacked_settings"]
+comparison_settings: ComparisonPlotSettings = st.session_state["Page2_comparison_settings"]
 
 st.set_page_config(layout="wide")
 set_production_page_style()
@@ -293,10 +299,10 @@ if enable:
 
                         # When empty, fill the temorary selection buffer with the selected
                         # experiment object content
-                        if st.session_state["ManualSelectorBuffer"] == []:
-                            st.session_state["ManualSelectorBuffer"] = selected_experiments[
-                                current_view
-                            ]
+                        if st.session_state["Page2_ManualSelectorBuffer"] == []:
+                            st.session_state[
+                                "Page2_ManualSelectorBuffer"
+                            ] = selected_experiments[current_view]
 
                         # Get the complete cycle list associated to the selected experiment
                         id = status.get_index_of(current_view)
@@ -305,21 +311,21 @@ if enable:
                         # Show a multiple selection box with all the available cycles in which
                         # the user can manually add or remove a cycle, save the new list in a
                         # temporary buffer used on the proper rerun
-                        st.session_state["ManualSelectorBuffer"] = st.multiselect(
+                        st.session_state["Page2_ManualSelectorBuffer"] = st.multiselect(
                             "Select the cycles",
                             [obj.number for obj in cycles],
-                            default=st.session_state["ManualSelectorBuffer"],
+                            default=st.session_state["Page2_ManualSelectorBuffer"],
                         )
 
                         # If the temporary buffer is found to be different from the one currently
                         # set for the current view, update the current view
                         if (
-                            st.session_state["ManualSelectorBuffer"]
+                            st.session_state["Page2_ManualSelectorBuffer"]
                             != selected_experiments[current_view]
                         ):
                             selected_experiments.set(
                                 current_view,
-                                cycles=st.session_state["ManualSelectorBuffer"],
+                                cycles=st.session_state["Page2_ManualSelectorBuffer"],
                             )
                             st.experimental_rerun()
 
@@ -366,13 +372,30 @@ if enable:
                 st.markdown("#### Plot options")
 
                 st.markdown("###### Axis")
-                x_axis = st.selectbox("Select the series x axis", HALFCYCLE_SERIES)
-                y_axis = st.selectbox(
-                    "Select the series y axis",
-                    [element for element in HALFCYCLE_SERIES if element != x_axis],
+                stacked_settings.x_axis = st.selectbox(
+                    "Select the series x axis",
+                    HALFCYCLE_SERIES,
+                    index=HALFCYCLE_SERIES.index(stacked_settings.x_axis)
+                    if stacked_settings.x_axis
+                    else 0,
                 )
-                shared_x = st.checkbox(
+
+                sub_HALFCYCLE_SERIES = [
+                    x for x in HALFCYCLE_SERIES if x != stacked_settings.x_axis
+                ]
+                stacked_settings.y_axis = st.selectbox(
+                    "Select the series y axis",
+                    sub_HALFCYCLE_SERIES,
+                    index=sub_HALFCYCLE_SERIES.index(stacked_settings.y_axis)
+                    if stacked_settings.y_axis
+                    and stacked_settings.y_axis in sub_HALFCYCLE_SERIES
+                    else 0,
+                )
+                stacked_settings.shared_x = st.checkbox(
                     "Use shared x-axis",
+                    value=stacked_settings.shared_x
+                    if stacked_settings.shared_x and len(selected_experiments) == 1
+                    else False,
                     disabled=True if len(selected_experiments) == 1 else False,
                 )
 
@@ -384,8 +407,12 @@ if enable:
                         volume_is_available = False
                         break
 
-                scale_by_volume = st.checkbox(
-                    "Scale values by volume", value=False, disabled=not volume_is_available
+                stacked_settings.scale_by_volume = st.checkbox(
+                    "Scale values by volume",
+                    value=stacked_settings.scale_by_volume
+                    if volume_is_available
+                    else False,
+                    disabled=not volume_is_available,
                 )
 
                 area_is_available = True
@@ -396,20 +423,35 @@ if enable:
                         area_is_available = False
                         break
 
-                scale_by_area = st.checkbox(
-                    "Scale values by area", value=False, disabled=not area_is_available
+                stacked_settings.scale_by_area = st.checkbox(
+                    "Scale values by area",
+                    value=stacked_settings.scale_by_area if area_is_available else False,
+                    disabled=not area_is_available,
                 )
 
                 st.markdown("###### Series")
-                show_charge = st.checkbox("Show charge", value=True)
-                show_discharge = st.checkbox("Show discharge", value=True)
+                stacked_settings.show_charge = st.checkbox(
+                    "Show charge", value=stacked_settings.show_charge
+                )
+                stacked_settings.show_discharge = st.checkbox(
+                    "Show discharge", value=stacked_settings.show_charge
+                )
 
                 st.markdown("###### Aspect")
-                reverse = st.checkbox("Reversed colorscale", value=True)
-                font_size = st.number_input("Label font size", min_value=4, value=14)
-                plot_height = st.number_input(
-                    "Subplot height", min_value=10, max_value=1000, value=500, step=10
+                stacked_settings.reverse = st.checkbox(
+                    "Reversed colorscale", value=stacked_settings.reverse
                 )
+                stacked_settings.font_size = int(st.number_input(
+                    "Label font size",
+                    min_value=4,
+                    value=stacked_settings.font_size,
+                ))
+                stacked_settings.plot_height = int(st.number_input(
+                    "Subplot height",
+                    min_value=10,
+                    value=stacked_settings.plot_height,
+                    step=10,
+                ))
 
             with col1:
 
@@ -417,8 +459,8 @@ if enable:
                 fig = make_subplots(
                     cols=1,
                     rows=len(selected_experiments),
-                    shared_xaxes=shared_x,
-                    vertical_spacing=0.01 if shared_x else None,
+                    shared_xaxes=stacked_settings.shared_x,
+                    vertical_spacing=0.01 if stacked_settings.shared_x else None,
                 )
 
                 # For eache experiment update the correspondent subplot
@@ -428,8 +470,8 @@ if enable:
                     exp_id = status.get_index_of(name)
                     experiment: Experiment = status[exp_id]
                     cycles = experiment.cycles
-                    volume = experiment.volume if scale_by_volume else None
-                    area = experiment.area if scale_by_area else None
+                    volume = experiment.volume if stacked_settings.scale_by_volume else None
+                    area = experiment.area if stacked_settings.scale_by_area else None
 
                     # Get the user selected cycles and plot only the corresponden lines
                     num_traces = len(selected_experiments[name])
@@ -438,7 +480,7 @@ if enable:
                         # Get the shade associated to the current trace
                         shade = RGB_to_HEX(
                             *experiment.color.get_shade(
-                                trace_id, num_traces, reversed=reverse
+                                trace_id, num_traces, reversed=stacked_settings.reverse
                             )
                         )
 
@@ -446,15 +488,18 @@ if enable:
                         cycle = cycles[cycle_id]
 
                         # Print the charge halfcycle
-                        if cycle.charge is not None and show_charge is True:
+                        if (
+                            cycle.charge is not None
+                            and stacked_settings.show_charge is True
+                        ):
 
                             series_name = selected_experiments.get_label(name, cycle_id)
 
                             x_label, x_series = get_halfcycle_series(
-                                cycle.charge, x_axis, volume, area
+                                cycle.charge, stacked_settings.x_axis, volume, area
                             )
                             y_label, y_series = get_halfcycle_series(
-                                cycle.charge, y_axis, volume, area
+                                cycle.charge, stacked_settings.y_axis, volume, area
                             )
 
                             fig.add_trace(
@@ -469,15 +514,18 @@ if enable:
                             )
 
                         # Print the discharge halfcycle
-                        if cycle.discharge is not None and show_discharge is True:
+                        if (
+                            cycle.discharge is not None
+                            and stacked_settings.show_discharge is True
+                        ):
 
                             series_name = selected_experiments.get_label(name, cycle_id)
 
                             x_label, x_series = get_halfcycle_series(
-                                cycle.discharge, x_axis, volume, area
+                                cycle.discharge, stacked_settings.x_axis, volume, area
                             )
                             y_label, y_series = get_halfcycle_series(
-                                cycle.discharge, y_axis, volume, area
+                                cycle.discharge, stacked_settings.y_axis, volume, area
                             )
 
                             fig.add_trace(
@@ -513,9 +561,9 @@ if enable:
                 # Update the settings of plot layout
                 fig.update_layout(
                     plot_bgcolor="#FFFFFF",
-                    height=plot_height * len(selected_experiments.names),
+                    height=stacked_settings.plot_height * len(selected_experiments.names),
                     width=None,
-                    font=dict(size=font_size),
+                    font=dict(size=stacked_settings.font_size),
                 )
 
                 st.plotly_chart(fig, use_container_width=True)
@@ -523,30 +571,36 @@ if enable:
             with col2:
 
                 st.markdown("###### Export")
-                format = st.selectbox(
-                    "Select the format of the file", ["png", "jpeg", "svg", "pdf"]
+                available_formats = ["png", "jpeg", "svg", "pdf"]
+                stacked_settings.format = st.selectbox(
+                    "Select the format of the file",
+                    available_formats,
+                    index=available_formats.index(stacked_settings.format)
+                    if stacked_settings.format
+                    else 0,
                 )
 
-                suggested_width = int(2.5 * plot_height)
-                total_width = st.number_input(
+                suggested_width = int(2.5 * stacked_settings.plot_height)
+                stacked_settings.total_width = int(st.number_input(
                     "Total width",
                     min_value=10,
-                    max_value=2000,
-                    value=suggested_width if suggested_width <= 2000 else 2000,
-                )
+                    value=stacked_settings.total_width
+                    if stacked_settings.total_width
+                    else suggested_width,
+                ))
 
                 # Set new layout options to account for the user selected width
                 fig.update_layout(
                     plot_bgcolor="#FFFFFF",
-                    height=plot_height * len(selected_experiments.names),
-                    width=total_width,
-                    font=dict(size=font_size),
+                    height=stacked_settings.plot_height * len(selected_experiments.names),
+                    width=stacked_settings.total_width,
+                    font=dict(size=stacked_settings.font_size),
                 )
 
                 st.download_button(
                     "Download plot",
-                    data=fig.to_image(format=format),
-                    file_name=f"cycle_plot.{format}",
+                    data=fig.to_image(format=stacked_settings.format),
+                    file_name=f"cycle_plot.{stacked_settings.format}",
                 )
 
     # Define a comparison plot tab to compare cycle belonging to different experiments
@@ -646,12 +700,27 @@ if enable:
                 st.markdown("#### Plot options")
 
                 st.markdown("###### Axis")
-                x_axis = st.selectbox(
-                    "Select the series x axis", HALFCYCLE_SERIES, key="x_comparison"
+                comparison_settings.x_axis = st.selectbox(
+                    "Select the series x axis",
+                    HALFCYCLE_SERIES,
+                    key="x_comparison",
+                    index=HALFCYCLE_SERIES.index(comparison_settings.x_axis)
+                    if comparison_settings.x_axis
+                    else 0,
                 )
-                y_axis = st.selectbox(
+
+                sub_HALFCYCLE_SERIES = [
+                    element
+                    for element in HALFCYCLE_SERIES
+                    if element != comparison_settings.x_axis
+                ]
+                comparison_settings.y_axis = st.selectbox(
                     "Select the series y axis",
-                    [element for element in HALFCYCLE_SERIES if element != x_axis],
+                    sub_HALFCYCLE_SERIES,
+                    index=sub_HALFCYCLE_SERIES.index(comparison_settings.y_axis)
+                    if comparison_settings.y_axis
+                    and comparison_settings.y_axis in sub_HALFCYCLE_SERIES
+                    else 0,
                     key="y_comparison",
                 )
 
@@ -663,32 +732,43 @@ if enable:
                         volume_is_available = False
                         break
 
-                scale_by_volume = st.checkbox(
+                comparison_settings.scale_by_volume = st.checkbox(
                     "Scale values by volume",
-                    value=False,
+                    value=comparison_settings.scale_by_volume
+                    if volume_is_available
+                    else False,
                     disabled=not volume_is_available,
                     key="comparison_plot",
                 )
 
                 area_is_available = True
-                for name in selected_experiments.view.keys():
-                    experiment_id = status.get_index_of(name)
+                for series in selected_series:
+                    experiment_id = status.get_index_of(series.experiment_name)
                     experiment = status[experiment_id]
                     if experiment.area is None:
                         area_is_available = False
                         break
 
-                scale_by_area = st.checkbox(
-                    "Scale values by area", value=False, disabled=not area_is_available, key="by_area_comparison"
+                comparison_settings.scale_by_area = st.checkbox(
+                    "Scale values by area",
+                    value=comparison_settings.scale_by_area if area_is_available else False,
+                    disabled=not area_is_available,
+                    key="by_area_comparison",
                 )
 
                 st.markdown("###### Aspect")
-                font_size = st.number_input(
-                    "Label font size", min_value=4, value=14, key="font_size_comparison"
-                )
-                height = st.number_input(
-                    "Plot height", min_value=10, max_value=1000, value=800, step=10
-                )
+                comparison_settings.font_size = int(st.number_input(
+                    "Label font size",
+                    min_value=4,
+                    value=comparison_settings.font_size,
+                    key="font_size_comparison",
+                ))
+                comparison_settings.height = int(st.number_input(
+                    "Plot height",
+                    min_value=10,
+                    value=comparison_settings.height if comparison_settings.height else 800,
+                    step=10,
+                ))
 
             with col1:
 
@@ -706,17 +786,23 @@ if enable:
 
                     label = entry.label
                     color = entry.hex_color
-                    volume = status[exp_idx].volume if scale_by_volume else None
-                    area = status[exp_idx].area if scale_by_area else None
+                    volume = (
+                        status[exp_idx].volume
+                        if comparison_settings.scale_by_volume
+                        else None
+                    )
+                    area = (
+                        status[exp_idx].area if comparison_settings.scale_by_area else None
+                    )
 
                     # Print the charge halfcycle
                     if cycle.charge is not None:
 
                         x_label, x_series = get_halfcycle_series(
-                            cycle.charge, x_axis, volume, area
+                            cycle.charge, comparison_settings.x_axis, volume, area
                         )
                         y_label, y_series = get_halfcycle_series(
-                            cycle.charge, y_axis, volume, area
+                            cycle.charge, comparison_settings.y_axis, volume, area
                         )
 
                         fig.add_trace(
@@ -734,10 +820,10 @@ if enable:
                     if cycle.discharge is not None:
 
                         x_label, x_series = get_halfcycle_series(
-                            cycle.discharge, x_axis, volume, area
+                            cycle.discharge, comparison_settings.x_axis, volume, area
                         )
                         y_label, y_series = get_halfcycle_series(
-                            cycle.discharge, y_axis, volume, area
+                            cycle.discharge, comparison_settings.y_axis, volume, area
                         )
 
                         fig.add_trace(
@@ -773,9 +859,9 @@ if enable:
                 # Update the settings of plot layout
                 fig.update_layout(
                     plot_bgcolor="#FFFFFF",
-                    height=height,
+                    height=comparison_settings.height,
                     width=None,
-                    font=dict(size=font_size),
+                    font=dict(size=comparison_settings.font_size),
                 )
 
                 st.plotly_chart(fig, use_container_width=True)
@@ -784,32 +870,34 @@ if enable:
 
                 # Add to the right column the export option
                 st.markdown("###### Export")
-                format = st.selectbox(
+                available_formats = ["png", "jpeg", "svg", "pdf"]
+                comparison_settings.format = st.selectbox(
                     "Select the format of the file",
-                    ["png", "jpeg", "svg", "pdf"],
+                    available_formats,
+                    index=available_formats.index(comparison_settings.format)
+                    if comparison_settings.format
+                    else 0,
                     key="format_comparison",
                 )
 
-                suggested_width = int(2.0 * height)
-                width = st.number_input(
+                comparison_settings.width = int(st.number_input(
                     "Plot width",
                     min_value=10,
-                    max_value=2000,
-                    value=suggested_width if suggested_width <= 2000 else 2000,
-                )
+                    value=comparison_settings.width,
+                ))
 
                 # Update the settings of plot layout to account for the user define width
                 fig.update_layout(
                     plot_bgcolor="#FFFFFF",
-                    height=height,
-                    width=width,
-                    font=dict(size=font_size),
+                    height=comparison_settings.height,
+                    width=comparison_settings.width,
+                    font=dict(size=comparison_settings.font_size),
                 )
 
                 st.download_button(
                     "Download plot",
-                    data=fig.to_image(format=format),
-                    file_name=f"cycle_comparison_plot.{format}",
+                    data=fig.to_image(format=comparison_settings.format),
+                    file_name=f"cycle_comparison_plot.{comparison_settings.format}",
                 )
 
 # If there are no experiments in the buffer suggest to the user to load data form the main page
@@ -819,3 +907,5 @@ else:
     page and procede to upload and properly edit the required experiment files before
     accessing this page."""
     )
+
+# %%
