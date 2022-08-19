@@ -19,9 +19,7 @@ set_production_page_style()
 
 st.title("Experiment file manager")
 
-upload_tab, manipulation_tab, inspector_tab, save_tab = st.tabs(
-    ["Upload", "Edit", "Inspect", "💾 save/load"]
-)
+upload_tab, manipulation_tab, inspector_tab = st.tabs(["Upload", "Edit", "Inspect"])
 
 with upload_tab:
 
@@ -65,7 +63,7 @@ with upload_tab:
             )
 
         files = st.file_uploader(
-            "Select the cell-cycling datafiles", accept_multiple_files=True
+            "Select the cell-cycling datafiles", accept_multiple_files=True, type=[".dta", ".mpt"]
         )
 
         submitted = st.form_submit_button("Submit")
@@ -354,15 +352,15 @@ with manipulation_tab:
                     with ctime:
                         st.markdown("#### Runtime (s)")
                     with ccycle:
-                        st.markdown("#### Cycle")
+                        st.markdown("#### Halfcycle ID")
                     with chalfcycle:
-                        st.markdown("#### Halfcycle")
+                        st.markdown("#### Ordering")
 
                 # Generate the table body
                 max_cycle = 0  # Maximum cycle index selected
                 ordering_buffer = (
                     {}
-                )  # Buffer dictionary to store the Cycle and HalfCycle IDs associated to a given filename
+                )  # Buffer dictionary to store the Halfcycle ID and HalfCycle IDs associated to a given filename
 
                 # Iterate over all the entry of the suggested ordering list
                 for cycle, cycle_list in enumerate(current_ordering):
@@ -391,7 +389,7 @@ with manipulation_tab:
                                 # Save a temporary variable with the selected cycle
                                 new_cycle = int(
                                     st.number_input(
-                                        "Cycle ID:",
+                                        "Halfcycle ID:",
                                         min_value=0,
                                         value=cycle,
                                         step=1,
@@ -405,7 +403,7 @@ with manipulation_tab:
                                 # Save a temporary variable with the selected halfcycle
                                 new_halfcycle = int(
                                     st.number_input(
-                                        "Halfcycle order:",
+                                        "partial files order:",
                                         min_value=0,
                                         value=halfcycle,
                                         step=1,
@@ -431,18 +429,33 @@ with manipulation_tab:
                 for index, dictionary in enumerate(cycle_based_buffer):
                     if dictionary == {}:
                         missing.append(str(index))
+                
+                # Check if all the the partial halfcycle files in a group are of the same charge/discharge type
+                partial_halfcycle_type_mismatch = False
+                for buffer in cycle_based_buffer:
+                    is_charge_list = []
+                    for filename in buffer.values():
+                        is_charge = True if experiment.manager.halfcycles[filename].halfcycle_type == "charge" else False
+                        is_charge_list.append(is_charge)
+
+                    if any([value != is_charge_list[0] for value in is_charge_list]):
+                        partial_halfcycle_type_mismatch = True
+                        break                    
 
                 # If there are missing levels print a warning to the user
                 if missing != []:
                     missing_list = ", ".join(missing)
                     st.warning(
-                        f"WARNING: The Cycles IDs must be subsequent. The following IDs are missing: {missing_list}"
+                        f"WARNING: The Halfcycles IDs must be subsequent. The following IDs are missing: {missing_list}"
                     )
                 elif repetition:
                     st.warning(
-                        f"WARNING: The halfcycles ordering must not contain repetitions."
+                        f"WARNING: The ordering of partial halfcycle files must not contain repetitions."
                     )
-
+                elif partial_halfcycle_type_mismatch:
+                    st.warning(
+                        f"WARNING: Cannot join in the same halfcycle object charge and discharge files."
+                    )
                 # Define the new ordering appending the halfcycles in order of index
                 else:
                     new_ordering = [[] for _ in range(max_cycle + 1)]
@@ -598,40 +611,3 @@ with inspector_tab:
         with st.expander("Cycles report after parsing:", expanded=True):
             st.markdown("**Cycles report:**")
             st.table(df)
-
-with save_tab:
-
-    st.markdown("### Session save/load:")
-    st.write("In this tab you can save and load the state of the whole analysis.")
-
-    csave, cload = st.columns(2)
-
-    with csave:
-        st.markdown("##### Save session")
-
-        picklename = st.text_input(
-            "Enter the name of the file to save", value="my_analysis"
-        )
-
-        st.download_button(
-            label="💾 Save status",
-            data=save_session_state(),
-            file_name=f"{picklename}.pickle",
-        )
-
-    with cload:
-
-        st.markdown("##### Load session")
-
-        with st.form("Load", clear_on_submit=True):
-
-            source = st.file_uploader(
-                "Select the file", accept_multiple_files=False, type="pickle"
-            )
-
-            submitted = st.form_submit_button("Submit")
-
-        # If the button has been pressed and the file list is not empty load the files in the experiment
-        if submitted and source:
-            load_session_state(BytesIO(source.getvalue()))
-            st.experimental_rerun()
