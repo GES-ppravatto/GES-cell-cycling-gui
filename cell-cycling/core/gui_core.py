@@ -350,6 +350,7 @@ class ExperimentSelector:
 
 @dataclass
 class SingleCycleSeries:
+
     label: str
     experiment_name: str
     cycle_id: int
@@ -390,6 +391,7 @@ class ComparisonPlotSettings:
 
 @dataclass
 class CellcyclingPlotSettings:
+
     annotation_size: int = 14
     annotation_color: str = "#000000"
     primary_axis_name: str = None
