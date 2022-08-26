@@ -240,6 +240,21 @@ class ExperimentSelector:
             # Else create a new default view labelling
             else:
                 self.view[name] = [CycleFormat(idx) for idx in cycles]
+    
+    def empty_view(self, name: str):
+        """
+        Remove all the selected elements from a given view
+
+        Arguments
+        ---------
+        name : str
+            the name of the experiment to empty
+        """
+        if name in self.view:
+            self.view[name] = []
+        else:
+            raise RuntimeError
+
 
     def remove(self, name: str):
         """
@@ -253,7 +268,7 @@ class ExperimentSelector:
         if name in self.view:
             del self.view[name]
 
-    def clear(self):
+    def remove_all(self):
         """
         Clear all the view
         """
@@ -350,6 +365,7 @@ class ExperimentSelector:
 
 @dataclass
 class SingleCycleSeries:
+
     label: str
     experiment_name: str
     cycle_id: int
@@ -390,6 +406,7 @@ class ComparisonPlotSettings:
 
 @dataclass
 class CellcyclingPlotSettings:
+
     annotation_size: int = 14
     annotation_color: str = "#000000"
     primary_axis_name: str = None
