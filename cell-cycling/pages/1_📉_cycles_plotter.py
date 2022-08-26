@@ -341,9 +341,10 @@ try:
                             # When empty, fill the temorary selection buffer with the selected
                             # experiment object content
                             if manual_selection_buffer == []:
-                                st.session_state[
-                                    "Page2_ManualSelectorBuffer"
-                                ] = selected_experiments[current_view]
+                                manual_selection_buffer = selected_experiments[current_view]
+                            logger.debug(
+                                f"-> Temporary selection buffer: {manual_selection_buffer}"
+                            )
 
                             # Get the complete cycle list associated to the selected experiment
                             id = status.get_index_of(current_view)
@@ -548,6 +549,8 @@ try:
                         vertical_spacing=0.01 if stacked_settings.shared_x else None,
                     )
 
+                    x_label, y_label = None, None
+
                     # For eache experiment update the correspondent subplot
                     for index, name in enumerate(selected_experiments.names):
 
@@ -564,6 +567,8 @@ try:
 
                         # Get the user selected cycles and plot only the corresponden lines
                         num_traces = len(selected_experiments[name])
+                        logger.debug(f"-> Number of traces: {num_traces}")
+
                         for trace_id, cycle_id in enumerate(selected_experiments[name]):
 
                             # Get the shade associated to the current trace
@@ -629,7 +634,7 @@ try:
                                     col=1,
                                 )
 
-                    if stacked_settings.show_charge or stacked_settings.show_discharge:
+                    if x_label and y_label:
 
                         # Update the settings of the x-axis
                         fig.update_xaxes(
