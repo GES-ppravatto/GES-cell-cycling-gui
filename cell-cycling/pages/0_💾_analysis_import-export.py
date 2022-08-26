@@ -5,9 +5,11 @@ import streamlit as st
 from core.session_state_manager import save_session_state, load_session_state
 
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-#logging.basicConfig(filename=st.session_state["LogName"])
+# Fetch logger from the session state
+if "Logger" in st.session_state:
+    logger: logging.Logger = st.session_state["Logger"]
+else:
+    raise RuntimeError
 
 
 def print_log_entry(name, save: bool = True):
@@ -20,6 +22,10 @@ def print_log_entry(name, save: bool = True):
 logger.info("RUNNING export/import page rendering")
 
 try:
+
+    with st.sidebar:
+        st.info(f'Session token: {st.session_state["Token"]}')
+
     st.title("Analysis Import-Export page")
 
     texport, timport = st.tabs(["📤 Export", "📥 Import"])

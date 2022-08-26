@@ -7,12 +7,25 @@ from core.colors import ColorRGB, RGB_to_HEX, HEX_to_RGB
 from core.experiment import Experiment, _EXPERIMENT_INIT_COUNTER_
 from core.utils import set_production_page_style
 
+# Set the wide layout style and remove menus and markings from display
+st.set_page_config(layout="wide")
+set_production_page_style()
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+# Generate instance specific token to facilitate bug report
+if "Token" not in st.session_state:
+    st.session_state["Token"] = secrets.token_hex(4)
 
-with st.sidebar():
-    st.write(secrets.token_hex(8))
+@st.cache
+def init_logger():
+    logger = logging.getLogger(__name__)
+    handler = logging.FileHandler(f'{st.session_state["Token"]}.log', mode="w")
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s [line: %(lineno)d]")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    return logger
+
+logger = init_logger()
 
 try:
 
@@ -22,7 +35,7 @@ try:
     # The current page
     if "ProgramStatus" not in st.session_state:
         st.session_state["Version"] = "0.1.0"
-        #st.session_state["LogName"] = logname
+        st.session_state["Logger"] = logger
         st.session_state["ProgramStatus"] = ProgramStatus()
         st.session_state["UploadActionRadio"] = None
         st.session_state["UploadConfirmation"] = [None, None]
@@ -31,9 +44,8 @@ try:
     # Create a short name for the ProgramStatus object in the session_state chache
     status: ProgramStatus = st.session_state["ProgramStatus"]
 
-    # Set the wide layout style and remove menus and markings from display
-    st.set_page_config(layout="wide")
-    set_production_page_style()
+    with st.sidebar:
+        st.info(f'Session token: {st.session_state["Token"]}')
 
     st.title("Experiment file manager")  # Print a title for the page
 

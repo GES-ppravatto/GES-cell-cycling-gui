@@ -1,4 +1,4 @@
-import logging, sys, os, traceback, pickle
+import sys, os, logging, traceback, pickle
 from typing import Dict, List, Tuple, Union
 import streamlit as st
 import plotly.graph_objects as go
@@ -13,8 +13,11 @@ from core.colors import get_plotly_color
 from echemsuite.cellcycling.cycles import CellCycling
 
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+# Fetch logger from the session state
+if "Logger" in st.session_state:
+    logger: logging.Logger = st.session_state["Logger"]
+else:
+    raise RuntimeError
 
 
 # Define a dictionary of available markers with their plotly name
@@ -169,6 +172,9 @@ def clear_y_plot_limit(which: str = "both") -> None:
 
 try:
 
+    st.set_page_config(layout="wide")
+    set_production_page_style()
+
     logger.info("RUNNING cell-cycling plotter page rendering")
 
     # Check if the main page has set up the proper session state variables and check that at
@@ -180,9 +186,9 @@ try:
         status: ProgramStatus = st.session_state["ProgramStatus"]
         if len(status) == 0:
             enable = False
-
-    st.set_page_config(layout="wide")
-    set_production_page_style()
+    
+    with st.sidebar:
+        st.info(f'Session token: {st.session_state["Token"]}')
 
     # Set the title of the page and print some generic instruction
     st.title("Cell-cycling plotter")

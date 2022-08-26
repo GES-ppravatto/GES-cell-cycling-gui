@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import List, Tuple, Union
 import math, logging, sys, os, traceback, pickle
 import streamlit as st
@@ -19,8 +18,12 @@ from core.utils import set_production_page_style
 from core.colors import get_plotly_color, RGB_to_HEX
 from echemsuite.cellcycling.cycles import HalfCycle
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+
+# Fetch logger from the session state
+if "Logger" in st.session_state:
+    logger: logging.Logger = st.session_state["Logger"]
+else:
+    raise RuntimeError
 
 # %% Definition of labels and functions specific to the cycles plotting
 
@@ -150,7 +153,7 @@ try:
 
     # Fetch a fresh instance of the Progam Status and Experiment Selection variables from the session state
     status: ProgramStatus = st.session_state["ProgramStatus"]
-    selected_experiments: ExperimentSelector = st.session_state["Page2_CyclePlotSelection"] 
+    selected_experiments: ExperimentSelector = st.session_state["Page2_CyclePlotSelection"]
     selected_series: List[SingleCycleSeries] = st.session_state["Page2_ComparisonPlot"]
     stacked_settings: StackedPlotSettings = st.session_state["Page2_stacked_settings"]
     comparison_settings: ComparisonPlotSettings = st.session_state[
@@ -159,6 +162,9 @@ try:
 
     st.set_page_config(layout="wide")
     set_production_page_style()
+
+    with st.sidebar:
+        st.info(f'Session token: {st.session_state["Token"]}')
 
     # Set the title of the page and print some generic instruction
     st.title("Cycles plotter")
@@ -328,7 +334,9 @@ try:
                             st.markdown("###### Manual cycle selector")
 
                             # Give a easy name to the temporary selection buffer
-                            manual_selection_buffer = st.session_state["Page2_ManualSelectorBuffer"]
+                            manual_selection_buffer = st.session_state[
+                                "Page2_ManualSelectorBuffer"
+                            ]
 
                             # When empty, fill the temorary selection buffer with the selected
                             # experiment object content
@@ -499,7 +507,7 @@ try:
                     logger.debug(f"-> Show charge: {stacked_settings.show_charge}")
 
                     stacked_settings.show_discharge = st.checkbox(
-                        "Show discharge", value=stacked_settings.show_charge
+                        "Show discharge", value=stacked_settings.show_discharge
                     )
                     logger.debug(f"-> Show discharge: {stacked_settings.show_discharge}")
 
@@ -621,34 +629,36 @@ try:
                                     col=1,
                                 )
 
-                    # Update the settings of the x-axis
-                    fig.update_xaxes(
-                        title_text=x_label,
-                        showline=True,
-                        linecolor="black",
-                        gridwidth=1,
-                        gridcolor="#DDDDDD",
-                    )
+                    if stacked_settings.show_charge or stacked_settings.show_discharge:
 
-                    # Update the settings of the y-axis
-                    fig.update_yaxes(
-                        title_text=y_label,
-                        showline=True,
-                        linecolor="black",
-                        gridwidth=1,
-                        gridcolor="#DDDDDD",
-                    )
+                        # Update the settings of the x-axis
+                        fig.update_xaxes(
+                            title_text=x_label,
+                            showline=True,
+                            linecolor="black",
+                            gridwidth=1,
+                            gridcolor="#DDDDDD",
+                        )
 
-                    # Update the settings of plot layout
-                    fig.update_layout(
-                        plot_bgcolor="#FFFFFF",
-                        height=stacked_settings.plot_height
-                        * len(selected_experiments.names),
-                        width=None,
-                        font=dict(size=stacked_settings.font_size),
-                    )
+                        # Update the settings of the y-axis
+                        fig.update_yaxes(
+                            title_text=y_label,
+                            showline=True,
+                            linecolor="black",
+                            gridwidth=1,
+                            gridcolor="#DDDDDD",
+                        )
 
-                    st.plotly_chart(fig, use_container_width=True)
+                        # Update the settings of plot layout
+                        fig.update_layout(
+                            plot_bgcolor="#FFFFFF",
+                            height=stacked_settings.plot_height
+                            * len(selected_experiments.names),
+                            width=None,
+                            font=dict(size=stacked_settings.font_size),
+                        )
+
+                        st.plotly_chart(fig, use_container_width=True)
 
                 with col2:
 
@@ -692,6 +702,10 @@ try:
                         file_name=f"cycle_plot.{stacked_settings.format}",
                         on_click=lambda msg: logger.info(msg),
                         args=[f"DOWNLOAD cycle_plot.{stacked_settings.format}"],
+                        disabled=True
+                        if not stacked_settings.show_charge
+                        and not stacked_settings.show_discharge
+                        else False,
                     )
 
         # Define a comparison plot tab to compare cycle belonging to different experiments
