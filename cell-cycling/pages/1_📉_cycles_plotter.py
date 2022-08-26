@@ -19,7 +19,7 @@ from core.utils import set_production_page_style
 from core.colors import get_plotly_color, RGB_to_HEX
 from echemsuite.cellcycling.cycles import HalfCycle
 
-logger = logging.getLogger("GES-echem-gui-logger")
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # %% Definition of labels and functions specific to the cycles plotting
@@ -150,7 +150,7 @@ try:
 
     # Fetch a fresh instance of the Progam Status and Experiment Selection variables from the session state
     status: ProgramStatus = st.session_state["ProgramStatus"]
-    selected_experiments: ExperimentSelector = st.session_state["Page2_CyclePlotSelection"]
+    selected_experiments: ExperimentSelector = st.session_state["Page2_CyclePlotSelection"] 
     selected_series: List[SingleCycleSeries] = st.session_state["Page2_ComparisonPlot"]
     stacked_settings: StackedPlotSettings = st.session_state["Page2_stacked_settings"]
     comparison_settings: ComparisonPlotSettings = st.session_state[
@@ -327,9 +327,12 @@ try:
 
                             st.markdown("###### Manual cycle selector")
 
+                            # Give a easy name to the temporary selection buffer
+                            manual_selection_buffer = st.session_state["Page2_ManualSelectorBuffer"]
+
                             # When empty, fill the temorary selection buffer with the selected
                             # experiment object content
-                            if st.session_state["Page2_ManualSelectorBuffer"] == []:
+                            if manual_selection_buffer == []:
                                 st.session_state[
                                     "Page2_ManualSelectorBuffer"
                                 ] = selected_experiments[current_view]
@@ -344,7 +347,7 @@ try:
                             buffer_selection = st.multiselect(
                                 "Select the cycles",
                                 [obj.number for obj in cycles],
-                                default=st.session_state["Page2_ManualSelectorBuffer"],
+                                default=manual_selection_buffer,
                             )
                             st.session_state[
                                 "Page2_ManualSelectorBuffer"
@@ -361,11 +364,12 @@ try:
                                 )
                                 st.experimental_rerun()
 
-                            # Print a remave all button to allow the user to remove alle the selected cycles
+                            # Print a remove all button to allow the user to remove alle the selected cycles
                             clear_current_view = st.button("🧹 Clear All")
                             if clear_current_view:
                                 logger.info("Cleared selection buffer")
-                                selected_experiments[current_view] = []
+                                selected_experiments.empty_view(current_view)
+                                clean_manual_selection_buffer()
                                 st.experimental_rerun()  # Rerun to update the GUI
 
                         else:

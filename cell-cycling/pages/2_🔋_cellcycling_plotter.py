@@ -13,7 +13,7 @@ from core.colors import get_plotly_color
 from echemsuite.cellcycling.cycles import CellCycling
 
 
-logger = logging.getLogger("GES-echem-gui-logger")
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 

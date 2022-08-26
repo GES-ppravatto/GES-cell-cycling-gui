@@ -1,14 +1,18 @@
 import streamlit as st
 import pandas as pd
-import os, sys, logging, traceback, pickle
+import os, sys, logging, traceback, pickle, secrets
 
 from core.gui_core import ProgramStatus
 from core.colors import ColorRGB, RGB_to_HEX, HEX_to_RGB
 from core.experiment import Experiment, _EXPERIMENT_INIT_COUNTER_
 from core.utils import set_production_page_style
 
-logger = logging.getLogger("GES-echem-gui-logger")
+
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+with st.sidebar():
+    st.write(secrets.token_hex(8))
 
 try:
 
@@ -18,6 +22,7 @@ try:
     # The current page
     if "ProgramStatus" not in st.session_state:
         st.session_state["Version"] = "0.1.0"
+        #st.session_state["LogName"] = logname
         st.session_state["ProgramStatus"] = ProgramStatus()
         st.session_state["UploadActionRadio"] = None
         st.session_state["UploadConfirmation"] = [None, None]

@@ -4,8 +4,10 @@ import streamlit as st
 
 from core.session_state_manager import save_session_state, load_session_state
 
-logger = logging.getLogger("GES-echem-gui-logger")
+
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+#logging.basicConfig(filename=st.session_state["LogName"])
 
 
 def print_log_entry(name, save: bool = True):
