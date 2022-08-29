@@ -370,6 +370,7 @@ class SingleCycleSeries:
     experiment_name: str
     cycle_id: int
     hex_color: str = None
+    color_from_base: bool = False
 
 
 @dataclass

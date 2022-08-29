@@ -27,22 +27,22 @@ def init_logger():
 
 logger = init_logger()
 
+# Configure the session state for the first time with the data useful to completly describe
+# The current page
+if "ProgramStatus" not in st.session_state:
+    st.session_state["Version"] = "0.1.0"
+    st.session_state["Logger"] = logger
+    st.session_state["ProgramStatus"] = ProgramStatus()
+    st.session_state["UploadActionRadio"] = None
+    st.session_state["UploadConfirmation"] = [None, None]
+    st.session_state["SelectedExperimentName"] = None
+
+# Create a short name for the ProgramStatus object in the session_state chache
+status: ProgramStatus = st.session_state["ProgramStatus"]
+
 try:
 
     logger.info("RUNNING File manager page rendering")
-
-    # Configure the session state for the first time with the data useful to completly describe
-    # The current page
-    if "ProgramStatus" not in st.session_state:
-        st.session_state["Version"] = "0.1.0"
-        st.session_state["Logger"] = logger
-        st.session_state["ProgramStatus"] = ProgramStatus()
-        st.session_state["UploadActionRadio"] = None
-        st.session_state["UploadConfirmation"] = [None, None]
-        st.session_state["SelectedExperimentName"] = None
-
-    # Create a short name for the ProgramStatus object in the session_state chache
-    status: ProgramStatus = st.session_state["ProgramStatus"]
 
     with st.sidebar:
         st.info(f'Session token: {st.session_state["Token"]}')

@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from copy import deepcopy
 
 from core.gui_core import (
     ProgramStatus,
@@ -18,6 +19,9 @@ from core.utils import set_production_page_style
 from core.colors import get_plotly_color, RGB_to_HEX
 from echemsuite.cellcycling.cycles import HalfCycle
 
+
+st.set_page_config(layout="wide")
+set_production_page_style()
 
 # Fetch logger from the session state
 if "Logger" in st.session_state:
@@ -125,6 +129,46 @@ def get_halfcycle_series(
         raise ValueError
 
 
+# Create an instance of the ExperimentSelector class to be used to define the data to plot
+# and chache it in the session state
+if "Page2_CyclePlotSelection" not in st.session_state:
+    st.session_state["Page2_CyclePlotSelection"] = ExperimentSelector()
+    st.session_state["Page2_ManualSelectorBuffer"] = []
+    st.session_state["Page2_ComparisonPlot"] = []
+    st.session_state["Page2_stacked_settings"] = StackedPlotSettings()
+    st.session_state["Page2_comparison_settings"] = ComparisonPlotSettings()
+
+
+def clean_manual_selection_buffer():
+    st.session_state["Page2_ManualSelectorBuffer"] = []
+
+
+def remove_experiment_from_series_buffer(name: str) -> None:
+    """
+    Removes all the entry related to a given experiment from the selection buffer of the
+    comparison plot
+
+    Arguments
+    ---------
+    name : str
+        the name of the experiment to remove
+    """
+    selected_series: List[SingleCycleSeries] = st.session_state["Page2_ComparisonPlot"]
+    buffer = deepcopy(selected_series)
+    selected_series.clear()
+
+    for series in buffer:
+        if series.experiment_name != name:
+            selected_series.append(series)
+
+
+# Fetch a fresh instance of the Progam Status and Experiment Selection variables from the session state
+status: ProgramStatus = st.session_state["ProgramStatus"]
+selected_experiments: ExperimentSelector = st.session_state["Page2_CyclePlotSelection"]
+selected_series: List[SingleCycleSeries] = st.session_state["Page2_ComparisonPlot"]
+stacked_settings: StackedPlotSettings = st.session_state["Page2_stacked_settings"]
+comparison_settings: ComparisonPlotSettings = st.session_state["Page2_comparison_settings"]
+
 try:
 
     logger.info("RUNNING cycles plotter page rendering")
@@ -138,30 +182,6 @@ try:
         status: ProgramStatus = st.session_state["ProgramStatus"]
         if len(status) == 0:
             enable = False
-
-    # Create an instance of the ExperimentSelector class to be used to define the data to plot
-    # and chache it in the session state
-    if "Page2_CyclePlotSelection" not in st.session_state:
-        st.session_state["Page2_CyclePlotSelection"] = ExperimentSelector()
-        st.session_state["Page2_ManualSelectorBuffer"] = []
-        st.session_state["Page2_ComparisonPlot"] = []
-        st.session_state["Page2_stacked_settings"] = StackedPlotSettings()
-        st.session_state["Page2_comparison_settings"] = ComparisonPlotSettings()
-
-    def clean_manual_selection_buffer():
-        st.session_state["Page2_ManualSelectorBuffer"] = []
-
-    # Fetch a fresh instance of the Progam Status and Experiment Selection variables from the session state
-    status: ProgramStatus = st.session_state["ProgramStatus"]
-    selected_experiments: ExperimentSelector = st.session_state["Page2_CyclePlotSelection"]
-    selected_series: List[SingleCycleSeries] = st.session_state["Page2_ComparisonPlot"]
-    stacked_settings: StackedPlotSettings = st.session_state["Page2_stacked_settings"]
-    comparison_settings: ComparisonPlotSettings = st.session_state[
-        "Page2_comparison_settings"
-    ]
-
-    st.set_page_config(layout="wide")
-    set_production_page_style()
 
     with st.sidebar:
         st.info(f'Session token: {st.session_state["Token"]}')
@@ -321,7 +341,7 @@ try:
                             stride = int(stride)
                             logger.debug(f"-> stride: {stride}")
 
-                            apply = st.button("✅ Apply", key="comparison_apply")
+                            apply = st.button("✅ Apply", key="stacked_stride_apply")
                             if apply:
                                 cycles_in_view = np.arange(start, stop + 1, step=stride)
                                 selected_experiments.set(current_view, cycles_in_view)
@@ -719,54 +739,186 @@ try:
             logger.info("Rendering comparison plot tab")
 
             # Create a manager section allowing the user to select the trace to plot based on
-            # the experiment name and the cycle number
-            col1, col2, col3 = st.columns([2, 2, 1])
+            # the experiment name and the cycle number or using a stride base selection
+            st.markdown("### Experiment selector")
+
+            col1, col2 = st.columns(2)
 
             with col1:
+                st.markdown("##### Source experiment")
                 experiment_name = st.selectbox(
                     "Select the experiment",
                     status.get_experiment_names(),
                 )
-                logger.debug(f"-> Selected experiment: {experiment_name}")
-
-            with col2:
                 exp_idx = status.get_index_of(experiment_name)
                 experiment = status[exp_idx]
+                cycle_numbers = [obj.number for obj in experiment.cycles]
 
-                exclude = [
-                    entry.cycle_id
-                    for entry in selected_series
-                    if entry.experiment_name == experiment_name
-                ]
+                logger.debug(f"-> Selected experiment: {experiment_name}")
 
-                numbers = [obj.number for obj in experiment.cycles]
+                use_base_color = st.checkbox("Use experiment base color", value=True)
+                logger.debug(f"-> Using basecolor from experiment: {use_base_color}")
 
-                cycle_number = st.selectbox(
-                    "Select the cycle",
-                    [n for n in numbers if n not in exclude],
-                )
-                logger.debug(f"-> Selected cycle: {cycle_number}")
+                clear_experiment = st.button("🧹 Remove from plot")
 
-                cycle = experiment.cycles[numbers.index(cycle_number)]
-
-            with col3:
-                st.write("")
-                st.write("")
-                add = st.button("➕ Add", key="comparison")
-
-                if add:
-                    logger.info(
-                        f"ADD cycle {cycle_number} from experiment {experiment_name} to comparison plot"
-                    )
-                    selected_series.append(
-                        SingleCycleSeries(
-                            f"{experiment_name} [{cycle_number}]",
-                            experiment_name,
-                            cycle_number,
-                            hex_color=get_plotly_color(len(selected_series)),
-                        )
-                    )
+                if clear_experiment:
+                    logger.info(f"REMOVING experiment {experiment_name} from selection buffer")
+                    remove_experiment_from_series_buffer(experiment_name)
                     st.experimental_rerun()
+
+                st.markdown("##### Selector mode")
+                selector_mode = st.radio(
+                    "Select the cycle selector mode",
+                    ["Stride based selector", "Manual selector"],
+                )
+
+            with col2:
+                if selector_mode == "Stride based selector":
+                    logger.info("Entering stride bases selection mode")
+                    st.markdown("##### Stride-based cycle selector")
+
+                    max_cycle = len(cycle_numbers) - 1
+
+                    label_prefix = st.text_input(
+                        "Select a label prefix for the selected series",
+                        value=experiment_name,
+                    )
+                    logger.debug(f"-> Selected label prefix: {label_prefix}")
+
+                    # Show a number input to allow the selection of the start point
+                    start = st.number_input(
+                        "Start",
+                        min_value=0,
+                        max_value=max_cycle - 1,
+                        step=1,
+                    )
+                    start = int(start)
+                    logger.debug(f"-> start: {start}")
+
+                    # Show a number input to allow the selection of the stop point, please
+                    # notice how the stop point is excluded from the interval and, as such,
+                    # must be allowed to assume a maximum value equal to the last index +1
+                    stop = st.number_input(
+                        "Stop (included)",
+                        min_value=start + 1,
+                        max_value=max_cycle,
+                        value=max_cycle,
+                        step=1,
+                    )
+                    stop = int(stop)
+                    logger.debug(f"-> stop: {stop}")
+
+                    guess_stride = int(math.ceil(max_cycle / 10))
+                    # Show a number input to allow the selection of the stride
+                    stride = st.number_input(
+                        "Stride",
+                        min_value=1,
+                        max_value=max_cycle,
+                        step=1,
+                        value=guess_stride,
+                    )
+                    stride = int(stride)
+                    logger.debug(f"-> stride: {stride}")
+
+                    apply = st.button("✅ Apply", key="comparison_stride_apply")
+
+                    if apply:
+                        logger.debug("-> Pressed apply button")
+
+                        remove_experiment_from_series_buffer(experiment_name)
+
+                        cycles_in_selection = np.arange(start, stop + 1, step=stride)
+                        for n in cycles_in_selection:
+                            cycle = experiment.cycles[cycle_numbers.index(n)]
+                            
+                            duplicate = False
+                            for series in selected_series:
+                                if series.experiment_name == experiment_name and series.cycle_id == n:
+                                    duplicate = True
+                                    break
+                            if duplicate:
+                                continue
+
+                            selected_series.append(
+                                SingleCycleSeries(
+                                    f"{label_prefix} [{n}]",
+                                    experiment_name,
+                                    n,
+                                    hex_color=get_plotly_color(len(selected_series)),
+                                    color_from_base=use_base_color,
+                                )
+                            )
+                        #logger.info(f"Selection buffer set to: {selected_series}")
+                        st.experimental_rerun()
+
+                elif selector_mode == "Manual selector":
+                    logger.info("Entering manual selection mode")
+                    st.markdown("##### Manual cycle selector")
+
+                    multiple = st.checkbox("Use multiple selection", value=True)
+                    logger.debug(f"-> Multiple selector set to: {multiple}")
+
+                    exclude = [
+                        entry.cycle_id
+                        for entry in selected_series
+                        if entry.experiment_name == experiment_name
+                    ]
+
+                    selected_cycles = {}
+                    if multiple:
+                        logger.info("Entering multiple cycle selector")
+                        cycle_numbers = st.multiselect(
+                            "Select the cycle",
+                            [n for n in cycle_numbers if n not in exclude],
+                        )
+                        logger.debug(f"-> Selected cycles: {cycle_numbers}")
+
+                        label_prefix = st.text_input(
+                            "Select a label prefix for the selected series",
+                            value=experiment_name,
+                        )
+                        logger.debug(f"-> Selected label prefix: {label_prefix}")
+
+                        for n in cycle_numbers:
+                            selected_cycles[f"{label_prefix} [{n}]"] = n
+
+                    else:
+                        logger.info("Entering single cycle selector")
+                        cycle_number = st.selectbox(
+                            "Select the cycle", [n for n in cycle_numbers if n not in exclude]
+                        )
+                        logger.debug(f"-> Selected cycle: {cycle_number}")
+
+                        cycle_label = st.text_input(
+                            "Select a label for the selected series",
+                            value=f"{experiment_name} [{cycle_number}]",
+                        )
+                        logger.debug(f"-> Selected label: {cycle_label}")
+                        selected_cycles[cycle_label] = cycle_number
+
+                    add = st.button("➕ Add", key="comparison")
+
+                    if add:
+                        for label, n in selected_cycles.items():
+
+                            logger.info(
+                                f"ADD cycle {n} from experiment {experiment_name} to comparison plot"
+                            )
+
+                            cycle = experiment.cycles[cycle_numbers.index(n)]
+                            selected_series.append(
+                                SingleCycleSeries(
+                                    label,
+                                    experiment_name,
+                                    n,
+                                    hex_color=get_plotly_color(len(selected_series)),
+                                    color_from_base=use_base_color,
+                                )
+                            )
+
+                        st.experimental_rerun()
+
+            logger.info(f"Currently selected series: {selected_series}")
 
             # Create a setup section to define the series to visualize and their color/name
             if selected_series != []:
@@ -797,11 +949,11 @@ try:
                             del selected_series[series_position]
                             st.experimental_rerun()
 
-                        st.markdown("---")
+                        # st.markdown("---")
 
-                        st.markdown("###### Current selection")
-                        st.markdown(f"Experiment: `{experiment_name}`")
-                        st.markdown(f"Cycle: `{cycle_number}`")
+                        # st.markdown("###### Current selection")
+                        # st.markdown(f"Experiment: `{experiment_name}`")
+                        # st.markdown(f"Cycle: `{cycle_number}`")
 
                     with cright:
                         logger.info("Entering series edit menu")
