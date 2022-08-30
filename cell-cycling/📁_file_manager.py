@@ -6,6 +6,7 @@ from core.gui_core import ProgramStatus
 from core.colors import ColorRGB, RGB_to_HEX, HEX_to_RGB
 from core.experiment import Experiment, _EXPERIMENT_INIT_COUNTER_
 from core.utils import set_production_page_style
+from core.post_process_handler import update_experiment_name, remove_experiment_entries
 
 # Set the wide layout style and remove menus and markings from display
 st.set_page_config(layout="wide")
@@ -243,6 +244,7 @@ try:
 
                 if delete:
                     logger.info(f"DELETED experiment {experiment.name}")
+                    remove_experiment_entries(experiment.name)
                     status.remove_experiment(status.get_index_of(experiment.name))
                     if st.session_state["SelectedExperimentName"] == experiment.name:
                         st.session_state["SelectedExperimentName"] = None
@@ -264,6 +266,7 @@ try:
                     )
                     experiment.name = new_experiment_name
                     st.session_state["SelectedExperimentName"] = new_experiment_name
+                    update_experiment_name(name, new_experiment_name)
                     st.experimental_rerun()
 
                 # Allow the user to define the experiment volume
