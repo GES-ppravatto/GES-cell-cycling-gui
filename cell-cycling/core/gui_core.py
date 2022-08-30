@@ -370,6 +370,7 @@ class SingleCycleSeries:
     experiment_name: str
     cycle_id: int
     hex_color: str = None
+    color_from_base: bool = False
 
 
 @dataclass
@@ -399,6 +400,7 @@ class ComparisonPlotSettings:
     show_charge: bool = True
     show_discharge: bool = True
     font_size: int = 14
+    reverse: bool = False
     height: int = 600
     format: str = None
     width: int = 1200
