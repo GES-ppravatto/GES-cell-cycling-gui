@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 import streamlit as st
 from typing import List, Union, Dict
@@ -240,7 +240,7 @@ class ExperimentSelector:
             # Else create a new default view labelling
             else:
                 self.view[name] = [CycleFormat(idx) for idx in cycles]
-    
+
     def empty_view(self, name: str):
         """
         Remove all the selected elements from a given view
@@ -254,7 +254,6 @@ class ExperimentSelector:
             self.view[name] = []
         else:
             raise RuntimeError
-
 
     def remove(self, name: str):
         """
@@ -425,3 +424,12 @@ class CellcyclingPlotSettings:
     height: str = 600
     format: str = None
     width: str = 1200
+    limits: dict = field(
+        default_factory=lambda: {
+            "x": [None, None],
+            "y": [None, None],
+            "y2": [None, None],
+            "y_annotation_reference": [None, None],
+        }
+    )
+    annotations: dict = field(default_factory=lambda: {})
