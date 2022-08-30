@@ -296,15 +296,18 @@ try:
                     # user can select the desired cycles
                     with col2:
 
+                        # Get the complete cycle list associated to the selected experiment
+                        id = status.get_index_of(current_view)
+                        cycles = status[id].cycles
+
                         # Show the appropriate selection box
-                        if view_mode == "Constant-interval cycle selector":
+                        if view_mode == "Constant-interval cycle selector" and len(cycles) > 1:
 
                             logger.info("ENTERING contant-interval view selection mode")
 
                             st.markdown("###### Constant interval cycle selector")
 
-                            id = status.get_index_of(current_view)
-                            max_cycle = len(status[id].cycles) - 1
+                            max_cycle = len(cycles) - 1
 
                             # Show a number input to allow the selection of the start point
                             start = st.number_input(
@@ -348,6 +351,9 @@ try:
                                 selected_experiments.set(current_view, cycles_in_view)
                                 logger.info(f"SET view using cycles {cycles_in_view}")
 
+                        elif view_mode == "Constant-interval cycle selector":
+                            st.info(f"The selected experiment has only {len(cycles)} cycle, cannot use stride-based selection")
+
                         elif view_mode == "Manual cycle selector":
 
                             logger.info("ENTERING manual view selection mode")
@@ -366,10 +372,6 @@ try:
                             logger.debug(
                                 f"-> Temporary selection buffer: {manual_selection_buffer}"
                             )
-
-                            # Get the complete cycle list associated to the selected experiment
-                            id = status.get_index_of(current_view)
-                            cycles = status[id].cycles
 
                             # Show a multiple selection box with all the available cycles in which
                             # the user can manually add or remove a cycle, save the new list in a
@@ -787,7 +789,8 @@ try:
                         st.experimental_rerun()
 
                 with col2:
-                    if selector_mode == "Stride based selector":
+                    if selector_mode == "Stride based selector" and len(cycle_numbers) > 1:
+
                         logger.info("Entering stride bases selection mode")
                         st.markdown("##### Stride-based cycle selector")
 
@@ -870,6 +873,9 @@ try:
                                 )
                             # logger.info(f"Selection buffer set to: {selected_series}")
                             st.experimental_rerun()
+                    
+                    elif selector_mode == "Stride based selector":
+                        st.info(f"The selected experiment has only {len(cycle_numbers)} cycle, cannot use stride based selection")
 
                     elif selector_mode == "Manual selector":
                         logger.info("Entering manual selection mode")
