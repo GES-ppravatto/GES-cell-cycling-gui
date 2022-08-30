@@ -7,7 +7,7 @@ from streamlit_plotly_events import plotly_events
 
 from core.gui_core import ProgramStatus, CellcyclingPlotSettings
 from core.experiment import ExperimentContainer
-from core.utils import set_production_page_style
+from core.utils import set_production_page_style, force_update_once
 from core.colors import get_plotly_color
 
 from echemsuite.cellcycling.cycles import CellCycling
@@ -1096,6 +1096,9 @@ try:
         page and procede to upload and properly edit the required experiment files before
         accessing this page."""
         )
+    
+    logger.info("FORCING RERUN AT END OF PAGE")
+    force_update_once()
 
 except st._RerunException:
     logger.info("EXPERIMENTAL RERUN CALLED")
