@@ -400,6 +400,7 @@ class ComparisonPlotSettings:
     show_charge: bool = True
     show_discharge: bool = True
     font_size: int = 14
+    reverse: bool = False
     height: int = 600
     format: str = None
     width: int = 1200
