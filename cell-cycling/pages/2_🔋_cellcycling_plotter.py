@@ -953,12 +953,12 @@ try:
 
                         st.markdown("---")
 
-                        logger.info("Render section to add new experiment to container")
-                        st.markdown("###### Add another experiment")
-
-                        col1, col2 = st.columns([4, 1])
+                        col1, col2, col3, col4 = st.columns([2.5, 1, 2.5, 1])
 
                         with col1:
+                            logger.info("Render section to add new experiment to container")
+                            st.markdown("###### Add another experiment")
+
                             valid_exp_names = [
                                 name
                                 for name in status.get_experiment_names()
@@ -971,6 +971,8 @@ try:
                             logger.debug(f"-> Selected experiment: '{experiment_name}'")
 
                         with col2:
+                            st.write("")
+                            st.write("")
                             st.write("")
                             st.write("")
                             add = st.button(
@@ -986,14 +988,10 @@ try:
                             selected_container.add_experiment(status[id])
                             st.experimental_rerun()
 
-                        st.markdown("---")
+                        with col3:
+                            logger.info("Render section to remove experiments from a container")
+                            st.markdown("###### Remove a currently loaded experiment")
 
-                        logger.info("Render section to remove experiments from a container")
-                        st.markdown("###### Remove a currently loaded experiment")
-
-                        col1, col2 = st.columns([4, 1])
-
-                        with col1:
                             get_experiment_names = st.multiselect(
                                 "Select the experiments to remove from the container",
                                 [name for name in selected_container.get_experiment_names],
@@ -1001,7 +999,9 @@ try:
                             )
                             logger.debug(f"-> Selected experiments: {get_experiment_names}")
 
-                        with col2:
+                        with col4:
+                            st.write("")
+                            st.write("")
                             st.write("")
                             st.write("")
                             remove = st.button(
@@ -1011,9 +1011,9 @@ try:
 
                         if remove:
                             logger.info(
-                                f"REMOVE experiments {experiments_names} from container {selected_container_name}"
+                                f"REMOVE experiments {get_experiment_names} from container {selected_container_name}"
                             )
-                            for name in experiments_names:
+                            for name in get_experiment_names:
                                 selected_container.remove_experiment(name)
                             st.experimental_rerun()
 
