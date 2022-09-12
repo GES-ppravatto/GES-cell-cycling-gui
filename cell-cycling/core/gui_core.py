@@ -384,6 +384,7 @@ class StackedPlotSettings:
     show_discharge: bool = True
     reverse: bool = False
     font_size: int = 14
+    axis_font_size: int = 18
     plot_height: int = 500
     format: str = None
     total_width: int = None
@@ -399,6 +400,7 @@ class ComparisonPlotSettings:
     show_charge: bool = True
     show_discharge: bool = True
     font_size: int = 14
+    axis_font_size: int = 18
     reverse: bool = False
     height: int = 600
     format: str = None
@@ -421,6 +423,7 @@ class CellcyclingPlotSettings:
     marker_with_border: str = False
     which_grid: str = None
     font_size: str = 14
+    axis_font_size: int = 18
     height: str = 600
     format: str = None
     width: str = 1200

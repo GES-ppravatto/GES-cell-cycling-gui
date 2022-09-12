@@ -549,12 +549,21 @@ try:
 
                         stacked_settings.font_size = int(
                             st.number_input(
-                                "Label font size",
+                                "Label/tick font size",
                                 min_value=4,
                                 value=stacked_settings.font_size,
                             )
                         )
-                        logger.debug(f"-> Font size: {stacked_settings.font_size}")
+                        logger.debug(f"-> Label/tick font size: {stacked_settings.font_size}")
+
+                        stacked_settings.axis_font_size = int(
+                            st.number_input(
+                                "Axis title font size",
+                                min_value=4,
+                                value=stacked_settings.axis_font_size,
+                            )
+                        )
+                        logger.debug(f"-> Axis font size: {stacked_settings.axis_font_size}")
 
                         stacked_settings.plot_height = int(
                             st.number_input(
@@ -672,6 +681,7 @@ try:
                             linecolor="black",
                             gridwidth=1,
                             gridcolor="#DDDDDD",
+                            title_font = {"size": stacked_settings.axis_font_size},
                         )
 
                         # Update the settings of the y-axis
@@ -681,6 +691,7 @@ try:
                             linecolor="black",
                             gridwidth=1,
                             gridcolor="#DDDDDD",
+                            title_font = {"size": stacked_settings.axis_font_size},
                         )
 
                         # Update the settings of plot layout
@@ -1098,13 +1109,23 @@ try:
                         st.markdown("###### Aspect")
                         comparison_settings.font_size = int(
                             st.number_input(
-                                "Label font size",
+                                "Label/tick font size",
                                 min_value=4,
                                 value=comparison_settings.font_size,
                                 key="font_size_comparison",
                             )
                         )
-                        logger.debug(f"-> Font size: {comparison_settings.font_size}")
+                        logger.debug(f"-> Label/tick font size: {comparison_settings.font_size}")
+
+                        comparison_settings.axis_font_size = int(
+                            st.number_input(
+                                "Axis title font size",
+                                min_value=4,
+                                value=comparison_settings.axis_font_size,
+                                key="axis_font_size_comparison",
+                            )
+                        )
+                        logger.debug(f"-> Axis title font size: {comparison_settings.axis_font_size}")
 
                         comparison_settings.reverse = st.checkbox(
                             "Use reversed experiment-based colorscale",
@@ -1227,6 +1248,7 @@ try:
                         linecolor="black",
                         gridwidth=1,
                         gridcolor="#DDDDDD",
+                        title_font = {"size": comparison_settings.axis_font_size},
                     )
 
                     # Update the settings of the y-axis
@@ -1236,6 +1258,7 @@ try:
                         linecolor="black",
                         gridwidth=1,
                         gridcolor="#DDDDDD",
+                        title_font = {"size": comparison_settings.axis_font_size},
                     )
 
                     # Update the settings of plot layout

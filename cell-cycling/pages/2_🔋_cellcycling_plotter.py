@@ -459,13 +459,23 @@ def cell_cycling_plotter_widget(
 
             plot_settings.font_size = int(
                 st.number_input(
-                    "Label font size",
+                    "Label/tick font size",
                     min_value=4,
                     value=plot_settings.font_size,
                     key=f"label_size_{unique_id}",
                 )
             )
-            logger.debug(f"-> Label font size: {plot_settings.font_size}")
+            logger.debug(f"-> Label/tick font size: {plot_settings.font_size}")
+
+            plot_settings.axis_font_size = int(
+                st.number_input(
+                    "Label font size",
+                    min_value=4,
+                    value=plot_settings.axis_font_size,
+                    key=f"axis_title_font_size_{unique_id}",
+                )
+            )
+            logger.debug(f"-> Axis title font size: {plot_settings.axis_font_size}")
 
             plot_settings.height = int(
                 st.number_input(
@@ -584,6 +594,7 @@ def cell_cycling_plotter_widget(
             linecolor="black",
             gridwidth=1,
             gridcolor="#DDDDDD",
+            title_font = {"size": plot_settings.axis_font_size},
         )
 
         fig.update_yaxes(
@@ -595,6 +606,7 @@ def cell_cycling_plotter_widget(
             linecolor="black",
             gridwidth=1,
             gridcolor="#DDDDDD" if plot_settings.which_grid == "Primary" else None,
+            title_font = {"size": plot_settings.axis_font_size},
         )
         fig.update_yaxes(
             title_text=f"{plot_settings.secondary_axis_marker}  {secondary_label}",
@@ -605,6 +617,7 @@ def cell_cycling_plotter_widget(
             linecolor="black",
             gridwidth=1,
             gridcolor="#DDDDDD" if plot_settings.which_grid == "Secondary" else None,
+            title_font = {"size": plot_settings.axis_font_size},
         )
 
         # Apply proper formatting to legend and plot background
