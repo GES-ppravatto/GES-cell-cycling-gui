@@ -683,6 +683,10 @@ try:
                             gridcolor="#DDDDDD",
                             title_font = {"size": stacked_settings.axis_font_size},
                         )
+                        
+                        if stacked_settings.shared_x:
+                            for n in range(len(selected_experiments)):
+                                fig.update_xaxes(title_text="", row=n, col=1)
 
                         # Update the settings of the y-axis
                         fig.update_yaxes(
