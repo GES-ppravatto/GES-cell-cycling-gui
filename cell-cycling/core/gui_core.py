@@ -377,6 +377,10 @@ class StackedPlotSettings:
 
     x_axis: str = None
     y_axis: str = None
+    x_autorange: bool = True
+    y_autorange: bool = True
+    x_range: List[float] = None
+    y_range: List[float] = None
     shared_x: bool = None
     scale_by_volume: bool = False
     scale_by_area: bool = False

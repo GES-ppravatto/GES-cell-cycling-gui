@@ -301,7 +301,10 @@ try:
                         cycles = status[id].cycles
 
                         # Show the appropriate selection box
-                        if view_mode == "Constant-interval cycle selector" and len(cycles) > 1:
+                        if (
+                            view_mode == "Constant-interval cycle selector"
+                            and len(cycles) > 1
+                        ):
 
                             logger.info("ENTERING contant-interval view selection mode")
 
@@ -352,7 +355,9 @@ try:
                                 logger.info(f"SET view using cycles {cycles_in_view}")
 
                         elif view_mode == "Constant-interval cycle selector":
-                            st.info(f"The selected experiment has only {len(cycles)} cycle, cannot use stride-based selection")
+                            st.info(
+                                f"The selected experiment has only {len(cycles)} cycle, cannot use stride-based selection"
+                            )
 
                         elif view_mode == "Manual cycle selector":
 
@@ -506,7 +511,9 @@ try:
                             else False,
                             disabled=not volume_is_available,
                         )
-                        logger.debug(f"-> Scale by volume: {stacked_settings.scale_by_volume}")
+                        logger.debug(
+                            f"-> Scale by volume: {stacked_settings.scale_by_volume}"
+                        )
 
                         area_is_available = True
                         for name in selected_experiments.view.keys():
@@ -535,7 +542,9 @@ try:
                         stacked_settings.show_discharge = st.checkbox(
                             "Show discharge", value=stacked_settings.show_discharge
                         )
-                        logger.debug(f"-> Show discharge: {stacked_settings.show_discharge}")
+                        logger.debug(
+                            f"-> Show discharge: {stacked_settings.show_discharge}"
+                        )
 
                     with st.expander("Aspect options:"):
                         st.markdown("###### Aspect")
@@ -554,7 +563,9 @@ try:
                                 value=stacked_settings.font_size,
                             )
                         )
-                        logger.debug(f"-> Label/tick font size: {stacked_settings.font_size}")
+                        logger.debug(
+                            f"-> Label/tick font size: {stacked_settings.font_size}"
+                        )
 
                         stacked_settings.axis_font_size = int(
                             st.number_input(
@@ -563,7 +574,9 @@ try:
                                 value=stacked_settings.axis_font_size,
                             )
                         )
-                        logger.debug(f"-> Axis font size: {stacked_settings.axis_font_size}")
+                        logger.debug(
+                            f"-> Axis font size: {stacked_settings.axis_font_size}"
+                        )
 
                         stacked_settings.plot_height = int(
                             st.number_input(
@@ -584,7 +597,7 @@ try:
                         cols=1,
                         rows=len(selected_experiments),
                         shared_xaxes=stacked_settings.shared_x,
-                        vertical_spacing=0.01 if stacked_settings.shared_x else None,
+                        vertical_spacing=0 if stacked_settings.shared_x else None,
                     )
 
                     x_label, y_label = None, None
@@ -681,9 +694,10 @@ try:
                             linecolor="black",
                             gridwidth=1,
                             gridcolor="#DDDDDD",
-                            title_font = {"size": stacked_settings.axis_font_size},
+                            title_font={"size": stacked_settings.axis_font_size},
+                            range=stacked_settings.x_range,
                         )
-                        
+
                         if stacked_settings.shared_x:
                             for n in range(len(selected_experiments)):
                                 fig.update_xaxes(title_text="", row=n, col=1)
@@ -695,7 +709,8 @@ try:
                             linecolor="black",
                             gridwidth=1,
                             gridcolor="#DDDDDD",
-                            title_font = {"size": stacked_settings.axis_font_size},
+                            title_font={"size": stacked_settings.axis_font_size},
+                            range=stacked_settings.y_range,
                         )
 
                         # Update the settings of plot layout
@@ -712,6 +727,87 @@ try:
                 with col2:
 
                     logger.info("Re-Entering plot option section to render export section")
+
+                    with st.expander("Range options"):
+                        st.markdown("###### Range options")
+
+                        st.markdown("X-axis range")
+                        x_autorange = st.checkbox(
+                            "Use automatic range for X", value=stacked_settings.x_autorange
+                        )
+                        logger.debug(f"-> X Autorange: {x_autorange}")
+
+                        if x_autorange != stacked_settings.x_autorange:
+                            stacked_settings.x_autorange = x_autorange
+                            stacked_settings.x_range = None
+                            logger.info(f"X Autorange: {stacked_settings.x_autorange}")
+                            st.experimental_rerun()
+
+                        if (
+                            stacked_settings.x_autorange is False
+                            and stacked_settings.x_range is None
+                        ):
+                            figure_data = fig.full_figure_for_development(warn=False)
+                            xmin, xmax = None, None
+                            for i in range(0, len(selected_experiments)):
+                                label = "xaxis" if i == 0 else f"xaxis{i+1}"
+                                xrange = [float(x) for x in figure_data.layout[label].range]
+                                xmin = xrange[0] if xmin is None else min(xmin, xrange[0])
+                                xmax = xrange[1] if xmax is None else max(xmax, xrange[1])
+                            stacked_settings.x_range = [float(xmin), float(xmax)]
+
+                        if stacked_settings.x_autorange is False:
+
+                            xmin, xmax = stacked_settings.x_range
+                            xmin = float(st.number_input("X-min", value=xmin, step=0.01))
+                            xmax = float(st.number_input("X-max", value=xmax, step=0.01))
+                            xrange = [xmin, xmax]
+
+                            if xrange != stacked_settings.x_range:
+                                stacked_settings.x_range = xrange
+                                logger.info(f"X range set to: {stacked_settings.x_range}")
+                                st.experimental_rerun()
+
+                        st.markdown("Y-axis range")
+
+                        y_autorange = st.checkbox(
+                            "Use automatic range for Y", value=stacked_settings.y_autorange
+                        )
+                        logger.debug(f"-> Y Autorange: {y_autorange}")
+
+                        if y_autorange != stacked_settings.y_autorange:
+                            stacked_settings.y_autorange = y_autorange
+                            stacked_settings.y_range = None
+                            logger.info(f"Y Autorange: {stacked_settings.y_autorange}")
+                            st.experimental_rerun()
+
+                        if (
+                            stacked_settings.y_autorange is False
+                            and stacked_settings.y_range is None
+                        ):
+
+                            figure_data = fig.full_figure_for_development(warn=False)
+
+                            ymin, ymax = None, None
+                            for i in range(len(selected_experiments)):
+                                label = "yaxis" if i == 0 else f"yaxis{i+1}"
+                                yrange = [float(y) for y in figure_data.layout[label].range]
+                                ymin = yrange[0] if ymin is None else min(ymin, yrange[0])
+                                ymax = yrange[1] if ymax is None else max(ymax, yrange[1])
+                            stacked_settings.y_range = [float(ymin), float(ymax)]
+
+                        if stacked_settings.y_autorange is False:
+
+                            ymin, ymax = stacked_settings.y_range
+                            ymin = float(st.number_input("Y-min", value=ymin, step=0.01))
+                            ymax = float(st.number_input("Y-max", value=ymax, step=0.01))
+                            yrange = [ymin, ymax]
+
+                            if yrange != stacked_settings.y_range:
+                                stacked_settings.y_range = yrange
+                                logger.info(f"Y range set to: {stacked_settings.y_range}")
+                                st.experimental_rerun()
+
 
                     with st.expander("Export options:"):
                         st.markdown("###### Export")
@@ -823,7 +919,7 @@ try:
                             min_value=0,
                             max_value=max_cycle - 1,
                             step=1,
-                            key="comparison_start"
+                            key="comparison_start",
                         )
                         start = int(start)
                         logger.debug(f"-> start: {start}")
@@ -837,7 +933,7 @@ try:
                             max_value=max_cycle,
                             value=max_cycle,
                             step=1,
-                            key="comparison_stop"
+                            key="comparison_stop",
                         )
                         stop = int(stop)
                         logger.debug(f"-> stop: {stop}")
@@ -850,7 +946,7 @@ try:
                             max_value=max_cycle,
                             step=1,
                             value=guess_stride,
-                            key="comparison_stride"
+                            key="comparison_stride",
                         )
                         stride = int(stride)
                         logger.debug(f"-> stride: {stride}")
@@ -888,9 +984,11 @@ try:
                                 )
                             # logger.info(f"Selection buffer set to: {selected_series}")
                             st.experimental_rerun()
-                    
+
                     elif selector_mode == "Stride based selector":
-                        st.info(f"The selected experiment has only {len(cycle_numbers)} cycle, cannot use stride based selection")
+                        st.info(
+                            f"The selected experiment has only {len(cycle_numbers)} cycle, cannot use stride based selection"
+                        )
 
                     elif selector_mode == "Manual selector":
                         logger.info("Entering manual selection mode")
@@ -1107,8 +1205,10 @@ try:
                             disabled=not area_is_available,
                             key="by_area_comparison",
                         )
-                        logger.debug(f"-> Scale by area: {comparison_settings.scale_by_area}")
-                    
+                        logger.debug(
+                            f"-> Scale by area: {comparison_settings.scale_by_area}"
+                        )
+
                     with st.expander("Plot aspect oprions:"):
                         st.markdown("###### Aspect")
                         comparison_settings.font_size = int(
@@ -1119,7 +1219,9 @@ try:
                                 key="font_size_comparison",
                             )
                         )
-                        logger.debug(f"-> Label/tick font size: {comparison_settings.font_size}")
+                        logger.debug(
+                            f"-> Label/tick font size: {comparison_settings.font_size}"
+                        )
 
                         comparison_settings.axis_font_size = int(
                             st.number_input(
@@ -1129,13 +1231,17 @@ try:
                                 key="axis_font_size_comparison",
                             )
                         )
-                        logger.debug(f"-> Axis title font size: {comparison_settings.axis_font_size}")
+                        logger.debug(
+                            f"-> Axis title font size: {comparison_settings.axis_font_size}"
+                        )
 
                         comparison_settings.reverse = st.checkbox(
                             "Use reversed experiment-based colorscale",
                             value=comparison_settings.reverse,
                         )
-                        logger.debug(f"-> Reversed colorscale: {comparison_settings.reverse}")
+                        logger.debug(
+                            f"-> Reversed colorscale: {comparison_settings.reverse}"
+                        )
 
                         comparison_settings.height = int(
                             st.number_input(
@@ -1252,7 +1358,7 @@ try:
                         linecolor="black",
                         gridwidth=1,
                         gridcolor="#DDDDDD",
-                        title_font = {"size": comparison_settings.axis_font_size},
+                        title_font={"size": comparison_settings.axis_font_size},
                     )
 
                     # Update the settings of the y-axis
@@ -1262,7 +1368,7 @@ try:
                         linecolor="black",
                         gridwidth=1,
                         gridcolor="#DDDDDD",
-                        title_font = {"size": comparison_settings.axis_font_size},
+                        title_font={"size": comparison_settings.axis_font_size},
                     )
 
                     # Update the settings of plot layout
