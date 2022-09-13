@@ -356,7 +356,10 @@ try:
 
                         elif view_mode == "Constant-interval cycle selector":
                             st.info(
-                                f"The selected experiment has only {len(cycles)} cycle, cannot use stride-based selection"
+                                f"""`ADVICE ON MODE OF OPERATION: ` 
+                                The selected experiment has only {len(cycles)} cycle.
+                                Stride selection mode cannot be used in this instance. Please 
+                                select the *"Manual selector"* option in the *"Selector mode menu"*."""
                             )
 
                         elif view_mode == "Manual cycle selector":
