@@ -3,6 +3,7 @@ import pandas as pd
 import os, sys, logging, traceback, pickle, secrets
 
 from core.gui_core import ProgramStatus
+from core.exceptions import MultipleExtensions, UnknownExtension
 from core.colors import ColorRGB, RGB_to_HEX, HEX_to_RGB
 from core.experiment import Experiment, _EXPERIMENT_INIT_COUNTER_
 from core.utils import set_production_page_style
@@ -114,61 +115,69 @@ try:
                 with st.spinner(text="Wait while the files are uploaded"):
 
                     # Define a new experiment object
-                    new_experiment = Experiment(files)
-
-                    # Set the name selected by the user if existing
-                    if name != "":
-                        new_experiment.name = name
+                    try:
+                        new_experiment = Experiment(files)
+                    
+                    except MultipleExtensions:
+                        st.error("ERROR: Cannot operate on different file types.")
+                    
+                    except UnknownExtension:
+                        st.error("ERROR: Unknown file extension detected.")
+                    
                     else:
-                        name = new_experiment.name
+                        # Set the name selected by the user if existing
+                        if name != "":
+                            new_experiment.name = name
+                        else:
+                            name = new_experiment.name
 
-                    # If the selected action is "Create new experiment" add the new experiment to the ProgramStatus
-                    if action == "Create new experiment":
-                        status.append_experiment(new_experiment)
-                        logger.info(f"CREATED experiment {name}")
+                        # If the selected action is "Create new experiment" add the new experiment to the ProgramStatus
+                        if action == "Create new experiment":
+                            status.append_experiment(new_experiment)
+                            logger.info(f"CREATED experiment {name}")
 
-                    # If the selected action is "Add new experiment", add the object to the already available one
-                    else:
-                        status[status.get_index_of(name)] += new_experiment
-                        logger.info(f"UPDATED experiment {name}")
+                        # If the selected action is "Add new experiment", add the object to the already available one
+                        else:
+                            status[status.get_index_of(name)] += new_experiment
+                            logger.info(f"UPDATED experiment {name}")
 
-                    # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
-                    st.session_state["UploadConfirmation"][0] = new_experiment.name
+                        # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
+                        st.session_state["UploadConfirmation"][0] = new_experiment.name
 
-                    # Generate a list of skipped files
-                    skipped_files = []
-                    if new_experiment.manager.instrument == "GAMRY":
-                        if len(new_experiment.manager.bytestreams) != len(
-                            new_experiment.manager.halfcycles
-                        ):
+                        # Generate a list of skipped files
+                        skipped_files = []
+                        if new_experiment.manager.instrument == "GAMRY":
+                            if len(new_experiment.manager.bytestreams) != len(
+                                new_experiment.manager.halfcycles
+                            ):
+                                for filename in new_experiment.manager.bytestreams.keys():
+                                    if filename not in new_experiment.manager.halfcycles.keys():
+                                        skipped_files.append(filename)
+                                st.session_state["UploadConfirmation"][1] = skipped_files
+
+                        elif new_experiment.manager.instrument == "BIOLOGIC":
                             for filename in new_experiment.manager.bytestreams.keys():
-                                if filename not in new_experiment.manager.halfcycles.keys():
+                                find = False
+                                for search in new_experiment.manager.halfcycles.keys():
+                                    if filename in search:
+                                        find = True
+                                        break
+
+                                if find is False:
                                     skipped_files.append(filename)
-                            st.session_state["UploadConfirmation"][1] = skipped_files
+                            if skipped_files != []:
+                                st.session_state["UploadConfirmation"][1] = skipped_files
 
-                    elif new_experiment.manager.instrument == "BIOLOGIC":
-                        for filename in new_experiment.manager.bytestreams.keys():
-                            find = False
-                            for search in new_experiment.manager.halfcycles.keys():
-                                if filename in search:
-                                    find = True
-                                    break
+                        else:
+                            raise RuntimeError
 
-                            if find is False:
-                                skipped_files.append(filename)
                         if skipped_files != []:
-                            st.session_state["UploadConfirmation"][1] = skipped_files
+                            status[status.get_index_of(name)]._skipped_files += len(
+                                skipped_files
+                            )
 
-                    else:
-                        raise RuntimeError
-
-                    if skipped_files != []:
-                        status[status.get_index_of(name)]._skipped_files += len(
-                            skipped_files
-                        )
-
-                    # Rerun the page to force update
-                    st.experimental_rerun()
+                        # Rerun the page to force update
+                        st.experimental_rerun()
 
         created_experiment = st.session_state["UploadConfirmation"][0]
         skipped_files = st.session_state["UploadConfirmation"][1]

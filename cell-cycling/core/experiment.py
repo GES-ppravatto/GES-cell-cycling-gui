@@ -63,7 +63,6 @@ class Experiment:
 
         # Check if all the extension match and determine the type of instrument
         if extensions.count(extensions[0]) != len(extensions):
-            st.error("ERROR: Cannot operate on different file types.")
             raise MultipleExtensions(extensions)
 
         if extensions[0].lower() == ".dta":
@@ -71,7 +70,6 @@ class Experiment:
         elif extensions[0].lower() == ".mpt":
             self._manager._instrument = Instrument.BIOLOGIC
         else:
-            st.error("ERROR: Unknown file extension detected.")
             raise UnknownExtension(extensions[0])
 
         # Load the files in the BytesIO stream buffer of the internal FileManager class
