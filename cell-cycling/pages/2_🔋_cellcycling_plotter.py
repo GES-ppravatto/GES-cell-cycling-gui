@@ -594,7 +594,7 @@ def cell_cycling_plotter_widget(
             linecolor="black",
             gridwidth=1,
             gridcolor="#DDDDDD",
-            title_font = {"size": plot_settings.axis_font_size},
+            title_font={"size": plot_settings.axis_font_size},
         )
 
         fig.update_yaxes(
@@ -606,7 +606,7 @@ def cell_cycling_plotter_widget(
             linecolor="black",
             gridwidth=1,
             gridcolor="#DDDDDD" if plot_settings.which_grid == "Primary" else None,
-            title_font = {"size": plot_settings.axis_font_size},
+            title_font={"size": plot_settings.axis_font_size},
         )
         fig.update_yaxes(
             title_text=f"{plot_settings.secondary_axis_marker}  {secondary_label}",
@@ -617,7 +617,7 @@ def cell_cycling_plotter_widget(
             linecolor="black",
             gridwidth=1,
             gridcolor="#DDDDDD" if plot_settings.which_grid == "Secondary" else None,
-            title_font = {"size": plot_settings.axis_font_size},
+            title_font={"size": plot_settings.axis_font_size},
         )
 
         # Apply proper formatting to legend and plot background
@@ -682,11 +682,19 @@ def cell_cycling_plotter_widget(
                 st.experimental_rerun()
 
         # Evaluate the current plot limits
-        xrange = figure_data.layout.xaxis.range
-        yrange = figure_data.layout.yaxis.range
+        xrange = (
+            None
+            if figure_data.layout.xaxis.range is None
+            else [float(x) for x in figure_data.layout.xaxis.range]
+        )
+        yrange = (
+            None
+            if figure_data.layout.yaxis.range is None
+            else [float(y) for y in figure_data.layout.yaxis.range]
+        )
 
         y2range = (
-            figure_data.layout.yaxis2.range
+            [float(y) for y in figure_data.layout.yaxis2.range]
             if hasattr(figure_data.layout, "yaxis2")
             else None
         )
@@ -716,7 +724,7 @@ def cell_cycling_plotter_widget(
             )
 
             logger.debug(
-                f"-> Linits: x={plot_settings.limits['x']}, y1={plot_settings.limits['y']}, y2={plot_settings.limits['y2']}"
+                f"-> Limits: x={plot_settings.limits['x']}, y1={plot_settings.limits['y']}, y2={plot_settings.limits['y2']}"
             )
             st.experimental_rerun()
 
@@ -731,17 +739,23 @@ def cell_cycling_plotter_widget(
             if plot_settings.y_axis_mode != "Only secondary":
                 st.markdown("###### primary Y-axis range")
                 # y1_range = figure_data.layout.yaxis.range
-                y1_max = st.number_input(
-                    "Maximum y-value",
-                    value=plot_settings.limits["y"][1],
-                    key=f"y1_max_{unique_id}",
+                y1_max = float(
+                    st.number_input(
+                        "Maximum y-value",
+                        value=plot_settings.limits["y"][1],
+                        step=1e-3,
+                        key=f"y1_max_{unique_id}",
+                    )
                 )
                 logger.debug(f"-> Max Y1: {y1_max}")
 
-                y1_min = st.number_input(
-                    "Minimum y-value",
-                    value=plot_settings.limits["y"][0],
-                    key=f"y1_min_{unique_id}",
+                y1_min = float(
+                    st.number_input(
+                        "Minimum y-value",
+                        value=plot_settings.limits["y"][0],
+                        step=1e-3,
+                        key=f"y1_min_{unique_id}",
+                    )
                 )
                 logger.debug(f"-> Min Y1: {y1_min}")
 
@@ -756,17 +770,23 @@ def cell_cycling_plotter_widget(
             if plot_settings.y_axis_mode != "Only primary":
                 st.markdown("###### secondary Y-axis range")
                 # y2_range = figure_data.layout.yaxis2.range
-                y2_max = st.number_input(
-                    "Maximum y-value",
-                    value=plot_settings.limits["y2"][1],
-                    key=f"y2_max_{unique_id}",
+                y2_max = float(
+                    st.number_input(
+                        "Maximum y-value",
+                        value=plot_settings.limits["y2"][1],
+                        step=1e-3,
+                        key=f"y2_max_{unique_id}",
+                    )
                 )
                 logger.debug(f"-> Max Y2: {y2_max}")
 
-                y2_min = st.number_input(
-                    "Minimum y-value",
-                    value=plot_settings.limits["y2"][0],
-                    key=f"y2_min_{unique_id}",
+                y2_min = float(
+                    st.number_input(
+                        "Minimum y-value",
+                        value=plot_settings.limits["y2"][0],
+                        step=1e-3,
+                        key=f"y2_min_{unique_id}",
+                    )
                 )
                 logger.debug(f"-> Min Y2: {y2_min}")
 
@@ -827,6 +847,9 @@ def cell_cycling_plotter_widget(
                 args=[f"DOWNLOAD cycle_plot.{plot_settings.format}"],
                 key=f"download_{unique_id}",
             )
+
+            logger.info("FORCING RERUN AT END OF PAGE")
+            force_update_once()
 
 
 try:
@@ -1002,7 +1025,9 @@ try:
                             st.experimental_rerun()
 
                         with col3:
-                            logger.info("Render section to remove experiments from a container")
+                            logger.info(
+                                "Render section to remove experiments from a container"
+                            )
                             st.markdown("###### Remove a currently loaded experiment")
 
                             get_experiment_names = st.multiselect(
@@ -1109,9 +1134,6 @@ try:
         page and procede to upload and properly edit the required experiment files before
         accessing this page."""
         )
-    
-    logger.info("FORCING RERUN AT END OF PAGE")
-    force_update_once()
 
 except st._RerunException:
     logger.info("EXPERIMENTAL RERUN CALLED")
