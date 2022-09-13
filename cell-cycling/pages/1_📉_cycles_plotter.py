@@ -298,7 +298,7 @@ try:
 
                         # Get the complete cycle list associated to the selected experiment
                         id = status.get_index_of(current_view)
-                        cycles = status[id].cycles
+                        cycles = status[id]._cycles
 
                         # Show the appropriate selection box
                         if (
@@ -613,7 +613,7 @@ try:
                         # Get the cycle list from the experiment
                         exp_id = status.get_index_of(name)
                         experiment: Experiment = status[exp_id]
-                        cycles = experiment.cycles
+                        cycles = experiment._cycles
                         volume = (
                             experiment.volume if stacked_settings.scale_by_volume else None
                         )
@@ -968,7 +968,7 @@ try:
                     )
                     exp_idx = status.get_index_of(experiment_name)
                     experiment = status[exp_idx]
-                    cycle_numbers = [obj.number for obj in experiment.cycles]
+                    cycle_numbers = [obj.number for obj in experiment._cycles]
 
                     logger.debug(f"-> Selected experiment: {experiment_name}")
 
@@ -1053,7 +1053,7 @@ try:
 
                             cycles_in_selection = np.arange(start, stop + 1, step=stride)
                             for n in cycles_in_selection:
-                                cycle = experiment.cycles[cycle_numbers.index(n)]
+                                cycle = experiment._cycles[cycle_numbers.index(n)]
 
                                 duplicate = False
                                 for series in selected_series:
@@ -1141,7 +1141,7 @@ try:
                                     f"ADD cycle {n} from experiment {experiment_name} to comparison plot"
                                 )
 
-                                cycle = experiment.cycles[cycle_numbers.index(n)]
+                                cycle = experiment._cycles[cycle_numbers.index(n)]
                                 selected_series.append(
                                     SingleCycleSeries(
                                         label,
@@ -1379,7 +1379,7 @@ try:
 
                         exp_idx = status.get_index_of(name)
                         experiment = status[exp_idx]
-                        cycle = experiment.cycles[cycle_id]
+                        cycle = experiment._cycles[cycle_id]
 
                         label = entry.label
 
