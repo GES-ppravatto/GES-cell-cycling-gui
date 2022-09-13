@@ -696,6 +696,7 @@ try:
                             gridcolor="#DDDDDD",
                             title_font={"size": stacked_settings.axis_font_size},
                             range=stacked_settings.x_range,
+                            dtick = stacked_settings.x_dtick,
                         )
 
                         if stacked_settings.shared_x:
@@ -711,6 +712,7 @@ try:
                             gridcolor="#DDDDDD",
                             title_font={"size": stacked_settings.axis_font_size},
                             range=stacked_settings.y_range,
+                            dtick = stacked_settings.y_dtick,
                         )
 
                         # Update the settings of plot layout
@@ -728,9 +730,11 @@ try:
 
                     logger.info("Re-Entering plot option section to render export section")
 
-                    with st.expander("Range options"):
+                    # Define a expander to hold the options relative to the plot range and ticks
+                    with st.expander("Range/ticks options"):
                         st.markdown("###### Range options")
 
+                        # Show a checkbox to enable/disable automatic axis range
                         st.markdown("X-axis range")
                         x_autorange = st.checkbox(
                             "Use automatic range for X", value=stacked_settings.x_autorange
@@ -743,6 +747,8 @@ try:
                             logger.info(f"X Autorange: {stacked_settings.x_autorange}")
                             st.experimental_rerun()
 
+                        # If autorange is set to false and no range is available get the 
+                        # starting values for the range according to the automatic ones
                         if (
                             stacked_settings.x_autorange is False
                             and stacked_settings.x_range is None
@@ -755,7 +761,10 @@ try:
                                 xmin = xrange[0] if xmin is None else min(xmin, xrange[0])
                                 xmax = xrange[1] if xmax is None else max(xmax, xrange[1])
                             stacked_settings.x_range = [float(xmin), float(xmax)]
-
+                            logger.info(f"SET x range: {stacked_settings.x_range}")
+                        
+                        # If the autorange is false get the user input about the desired range
+                        # and save it in the sesison state
                         if stacked_settings.x_autorange is False:
 
                             xmin, xmax = stacked_settings.x_range
@@ -765,11 +774,51 @@ try:
 
                             if xrange != stacked_settings.x_range:
                                 stacked_settings.x_range = xrange
-                                logger.info(f"X range set to: {stacked_settings.x_range}")
+                                logger.info(f"SET x range: {stacked_settings.x_range}")
                                 st.experimental_rerun()
+
+                        # If the autorange is false deactivate custom ticks
+                        else:
+                            stacked_settings.custom_x_dticks = False
+                        
+                        # Show a checkbox to enable custom axis tick
+                        stacked_settings.custom_x_dticks = st.checkbox(
+                            "Use custom X ticks intervals",
+                            value=stacked_settings.custom_x_dticks,
+                            disabled=stacked_settings.x_autorange,
+                        )
+                        logger.info(
+                            f"Use custom X ticks: {stacked_settings.custom_x_dticks}"
+                        )
+
+                        # If the custom tick option is enable get user input
+                        if stacked_settings.custom_x_dticks:
+                            
+                            # If no default value is set, compute one based on the range
+                            if stacked_settings.x_dtick is None:
+                                x_range = stacked_settings.x_range
+                                stacked_settings.x_dtick = float(
+                                    (x_range[1] - x_range[0]) / 10.0
+                                )
+                                logger.debug(f"-> Setting X dtick default: {stacked_settings.x_dtick}")
+
+                            # Get user input
+                            stacked_settings.x_dtick = float(
+                                st.number_input(
+                                    "X tick interval",
+                                    value=stacked_settings.x_dtick,
+                                    step=1e-3,
+                                )
+                            )
+                            logger.info(f"SET X dtick: {stacked_settings.x_dtick}")
+
+                        # If custom x dtick option is false celar the selected dtick value
+                        elif stacked_settings.x_dtick is not None:
+                            stacked_settings.x_dtick = None
 
                         st.markdown("Y-axis range")
 
+                        # Show a checkbox to enable/disable automatic axis range
                         y_autorange = st.checkbox(
                             "Use automatic range for Y", value=stacked_settings.y_autorange
                         )
@@ -781,6 +830,8 @@ try:
                             logger.info(f"Y Autorange: {stacked_settings.y_autorange}")
                             st.experimental_rerun()
 
+                        # If autorange is set to false and no range is available get the 
+                        # starting values for the range according to the automatic ones
                         if (
                             stacked_settings.y_autorange is False
                             and stacked_settings.y_range is None
@@ -795,7 +846,9 @@ try:
                                 ymin = yrange[0] if ymin is None else min(ymin, yrange[0])
                                 ymax = yrange[1] if ymax is None else max(ymax, yrange[1])
                             stacked_settings.y_range = [float(ymin), float(ymax)]
-
+                        
+                        # If the autorange is false get the user input about the desired range
+                        # and save it in the sesison state
                         if stacked_settings.y_autorange is False:
 
                             ymin, ymax = stacked_settings.y_range
@@ -808,6 +861,43 @@ try:
                                 logger.info(f"Y range set to: {stacked_settings.y_range}")
                                 st.experimental_rerun()
 
+                        # If the autorange is false deactivate custom ticks
+                        else:
+                            stacked_settings.custom_y_dticks = False
+
+                        # Show a checkbox to enable custom axis tick
+                        stacked_settings.custom_y_dticks = st.checkbox(
+                            "Use custom Y ticks intervals",
+                            value=stacked_settings.custom_y_dticks,
+                            disabled=stacked_settings.y_autorange,
+                        )
+                        logger.info(
+                            f"Use custom Y ticks: {stacked_settings.custom_y_dticks}"
+                        )
+
+                        # If the custom tick option is enable get user input
+                        if stacked_settings.custom_y_dticks:
+                            
+                            # If no default value is set, compute one based on the range
+                            if stacked_settings.y_dtick is None:
+                                y_range = stacked_settings.y_range
+                                stacked_settings.y_dtick = float(
+                                    (y_range[1] - y_range[0]) / 5
+                                )
+                            
+                            # Get user input
+                            stacked_settings.y_dtick = float(
+                                st.number_input(
+                                    "Y tick interval",
+                                    value=stacked_settings.y_dtick,
+                                    step=1e-3,
+                                )
+                            )
+                            logger.info(f"SET Y dtick: {stacked_settings.x_dtick}")
+
+                         # If custom y dtick option is false celar the selected dtick value
+                        elif stacked_settings.y_dtick is not None:
+                            stacked_settings.y_dtick = None
 
                     with st.expander("Export options:"):
                         st.markdown("###### Export")

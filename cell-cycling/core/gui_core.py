@@ -381,6 +381,10 @@ class StackedPlotSettings:
     y_autorange: bool = True
     x_range: List[float] = None
     y_range: List[float] = None
+    custom_x_dticks: bool = False
+    custom_y_dticks: bool = False
+    x_dtick: float = None
+    y_dtick: float = None
     shared_x: bool = None
     scale_by_volume: bool = False
     scale_by_area: bool = False
