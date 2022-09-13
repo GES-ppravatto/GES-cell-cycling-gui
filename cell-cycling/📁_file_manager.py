@@ -606,7 +606,7 @@ try:
             st.markdown("Instrument: ***{}***".format(experiment.manager.instrument))
 
             # Get the cycle list from the current experiment and compute the number of hidden cycles
-            cycles = experiment.cycles
+            cycles = experiment._cycles
             n_hidden = 0
             for cycle in cycles:
                 if cycle._hidden:
