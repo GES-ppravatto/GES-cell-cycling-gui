@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 from streamlit_plotly_events import plotly_events
 
 from core.gui_core import ProgramStatus, CellcyclingPlotSettings
-from core.experiment import ExperimentContainer
+from core.experiment import Experiment, ExperimentContainer
 from core.utils import set_production_page_style, force_update_once
 from core.colors import get_plotly_color
 
@@ -49,19 +49,23 @@ Y_OPTIONS = [
 # Define a function to exracte the wanted dataset from a cellcycling experiment give the label
 def get_data_series(
     option: str,
-    cellcycling: CellCycling,
-    volume: Union[float, None] = None,
-    area: Union[float, None] = None,
+    index: int,
+    container: ExperimentContainer,
+    scale_by_volume: bool = False,
+    scale_by_area: bool = False,
 ) -> Tuple[str, List[float]]:
 
     if option not in Y_OPTIONS:
         raise TypeError
 
-    if volume is not None and volume <= 0:
-        raise ValueError
+    experiment = container[index]
+    cellcycling = experiment.cellcycling
+
+    volume = experiment.volume if scale_by_volume else None
+    area = experiment.area if scale_by_area else None
 
     if option == "Capacity retention":
-        return "Capacity retention (%)", cellcycling.capacity_retention
+        return "Capacity retention (%)", container.capacity_retention(index)
     elif option == "Columbic efficiency":
         return "Columbic efficiency (%)", cellcycling.coulomb_efficiencies
     elif option == "Energy efficiency":
@@ -502,31 +506,29 @@ def cell_cycling_plotter_widget(
             logger.info(f"Plotting container {container.name}")
 
             offset = 0
-            cellcycling: CellCycling = None
+            experiment: Experiment
 
             # Iterate over each cell_cycling object in the container
-            for cycling_index, (name, cellcycling) in enumerate(container):
-
-                experiment = status[status.get_index_of(name)]
-                volume = experiment.volume if plot_settings.scale_by_volume else None
-                area = experiment.area if plot_settings.scale_by_area else None
+            for cycling_index, experiment in enumerate(container):
 
                 if cycling_index != 0:
                     offset += container.max_cycles_numbers[cycling_index - 1] + 1
 
-                cycle_index = [n + offset for n in cellcycling.numbers]
+                cycle_index = [n + offset for n in experiment.cellcycling.numbers]
 
                 primary_label, primary_axis = get_data_series(
                     plot_settings.primary_axis_name,
-                    cellcycling,
-                    volume=volume,
-                    area=area,
+                    cycling_index,
+                    container,
+                    scale_by_volume=plot_settings.scale_by_volume,
+                    scale_by_area=plot_settings.scale_by_area,
                 )
                 secondary_label, secondary_axis = get_data_series(
                     plot_settings.secondary_axis_name,
-                    cellcycling,
-                    volume=volume,
-                    area=area,
+                    cycling_index,
+                    container,
+                    scale_by_volume=plot_settings.scale_by_volume,
+                    scale_by_area=plot_settings.scale_by_area,
                 )
 
                 primary_marker = MARKERS[plot_settings.primary_axis_marker]
@@ -958,102 +960,157 @@ try:
             if available_containers != []:
 
                 with st.expander("Edit experiment container", expanded=False):
-
                     logger.info("Entering container editor")
 
                     st.markdown("#### Edit an existing container")
-                    selected_container_name = st.selectbox(
-                        "Select the container to edit",
-                        [obj.name for obj in available_containers],
-                    )
-                    logger.debug(f"-> Selected container: {selected_container_name}")
 
-                    delete = st.button("❌ Delete the container")
+                    col1, col2 = st.columns(2)
 
-                    if delete:
-                        logger.info(f"REMOVING container '{selected_container_name}'")
-                        idx = [obj.name for obj in available_containers].index(
-                            selected_container_name
+                    with col1:
+                        selected_container_name = st.selectbox(
+                            "Select the container to edit",
+                            [obj.name for obj in available_containers],
                         )
-                        del available_containers[idx]
-                        st.experimental_rerun()
+                        logger.debug(f"-> Selected container: {selected_container_name}")
+
+                        delete = st.button("❌ Delete the container")
+
+                        if delete:
+                            logger.info(f"REMOVING container '{selected_container_name}'")
+                            idx = [obj.name for obj in available_containers].index(
+                                selected_container_name
+                            )
+                            del available_containers[idx]
+                            st.experimental_rerun()
+
+                        st.markdown("---")
+
+                        operation_mode = st.radio(
+                            "Select the operation mode",
+                            ["Change reference", "Add experiment", "Remove experiment"],
+                        )
 
                     if selected_container_name != None:
 
                         container_idx: int = [
                             container.name for container in available_containers
                         ].index(selected_container_name)
+
                         selected_container: ExperimentContainer = available_containers[
                             container_idx
                         ]
 
-                        st.markdown("---")
-
-                        col1, col2, col3, col4 = st.columns([2.5, 1, 2.5, 1])
-
-                        with col1:
-                            logger.info("Render section to add new experiment to container")
-                            st.markdown("###### Add another experiment")
-
-                            valid_exp_names = [
-                                name
-                                for name in status.get_experiment_names()
-                                if name not in selected_container.get_experiment_names
-                            ]
-                            experiment_name = st.selectbox(
-                                "Select the experiments to add to the container",
-                                valid_exp_names,
-                            )
-                            logger.debug(f"-> Selected experiment: '{experiment_name}'")
-
                         with col2:
-                            st.write("")
-                            st.write("")
-                            st.write("")
-                            st.write("")
-                            add = st.button(
-                                "➕ Add experiment",
-                                disabled=True if experiment_name is None else False,
-                            )
 
-                        if add:
-                            logger.info(
-                                f"ADD experiment {experiment_name} to container {selected_container_name}"
-                            )
-                            id = status.get_index_of(experiment_name)
-                            selected_container.add_experiment(status[id])
-                            st.experimental_rerun()
+                            if operation_mode == "Change reference":
 
-                        with col3:
-                            logger.info(
-                                "Render section to remove experiments from a container"
-                            )
-                            st.markdown("###### Remove a currently loaded experiment")
+                                logger.info(
+                                    "Render section to add change reference cycle of the container"
+                                )
+                                st.markdown("###### Change container reference")
 
-                            get_experiment_names = st.multiselect(
-                                "Select the experiments to remove from the container",
-                                [name for name in selected_container.get_experiment_names],
-                                key="add_experiment_to_existing",
-                            )
-                            logger.debug(f"-> Selected experiments: {get_experiment_names}")
+                                current_reference = selected_container.reference
+                                exp_index = int(
+                                    st.number_input(
+                                        "Select experiment index",
+                                        value=current_reference[0],
+                                        min_value=0,
+                                        max_value=len(selected_container) - 1,
+                                        step=1,
+                                        disabled=True
+                                        if len(selected_container) == 0
+                                        else False,
+                                    )
+                                )
 
-                        with col4:
-                            st.write("")
-                            st.write("")
-                            st.write("")
-                            st.write("")
-                            remove = st.button(
-                                "➖ Remove experiment",
-                                disabled=True if get_experiment_names == [] else False,
-                            )
+                                cycle_index = int(
+                                    st.number_input(
+                                        "Select cycle index",
+                                        value=current_reference[1],
+                                        min_value=0,
+                                        max_value=len(
+                                            selected_container[exp_index]._cycles
+                                        )-1,
+                                        step=1,
+                                        disabled=True
+                                        if len(selected_container) == 0
+                                        else False,
+                                    )
+                                )
 
-                        if remove:
-                            logger.info(
-                                f"REMOVE experiments {get_experiment_names} from container {selected_container_name}"
-                            )
-                            for name in get_experiment_names:
-                                selected_container.remove_experiment(name)
-                            st.experimental_rerun()
+                                apply_ref = st.button("🗒️ Apply new reference")
+
+                                if apply_ref:
+                                    selected_container.reference = [exp_index, cycle_index]
+                                    st.experimental_rerun()
+
+                                # selected_container.
+
+                            elif operation_mode == "Add experiment":
+                                logger.info(
+                                    "Render section to add new experiment to container"
+                                )
+                                st.markdown("###### Add another experiment")
+
+                                valid_exp_names = [
+                                    name
+                                    for name in status.get_experiment_names()
+                                    if name not in selected_container.get_experiment_names
+                                ]
+                                experiment_name = st.selectbox(
+                                    "Select the experiments to add to the container",
+                                    valid_exp_names,
+                                )
+                                logger.debug(f"-> Selected experiment: '{experiment_name}'")
+
+                                add = st.button(
+                                    "➕ Add experiment",
+                                    disabled=True if experiment_name is None else False,
+                                )
+
+                                if add:
+                                    logger.info(
+                                        f"ADD experiment {experiment_name} to container {selected_container_name}"
+                                    )
+                                    id = status.get_index_of(experiment_name)
+                                    selected_container.add_experiment(status[id])
+                                    st.experimental_rerun()
+
+                            else:
+                                logger.info(
+                                    "Render section to remove experiments from a container"
+                                )
+                                st.markdown("###### Remove a currently loaded experiment")
+
+                                get_experiment_names = st.multiselect(
+                                    "Select the experiments to remove from the container",
+                                    [
+                                        name
+                                        for name in selected_container.get_experiment_names
+                                    ],
+                                    key="add_experiment_to_existing",
+                                )
+                                logger.debug(
+                                    f"-> Selected experiments: {get_experiment_names}"
+                                )
+
+                                remove = st.button(
+                                    "➖ Remove experiment",
+                                    disabled=True if get_experiment_names == [] else False,
+                                )
+
+                                if remove:
+                                    logger.info(
+                                        f"REMOVE experiments {get_experiment_names} from container {selected_container_name}"
+                                    )
+                                    for name in get_experiment_names:
+                                        selected_container.remove_experiment(name)
+                                    st.experimental_rerun()
+
+                    else:
+                        st.info(
+                            "Cannot show edit menu, no experiment container has been selected yet."
+                        )
 
         # Define a plot tab to hold the plotted data
         with plot_tab:

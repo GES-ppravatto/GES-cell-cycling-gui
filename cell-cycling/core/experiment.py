@@ -46,7 +46,7 @@ class Experiment:
             volume in liters associated to the experiment. Useful in the computation of
             volumetrical properties
         _area : float
-            area in squared centimeters associated to the experiment. Useful in the 
+            area in squared centimeters associated to the experiment. Useful in the
             computation of surface related properties
         _skipped_files : int
             counter of the number of files skipped during the parsing process
@@ -215,7 +215,7 @@ class Experiment:
         if type(value) != float or value <= 0:
             raise ValueError
         self._volume = value
-    
+
     @property
     def area(self) -> float:
         """
@@ -309,7 +309,7 @@ class Experiment:
         """
         getter of the cycles list
         """
-        return self._cycles
+        return [cycle for cycle in self._cycles if cycle._hidden is False]
 
     @property
     def cellcycling(self) -> CellCycling:
@@ -326,10 +326,18 @@ class ExperimentContainer:
         self._name = name
         self._color = color if color is not None else "#000000"
         self._experiments: List[Experiment] = []
+        self._reference: List[int, int] = [0, 0]
+        self._capacity_retention = []
 
-    def __iter__(self) -> Tuple[str, CellCycling]:
+    def __getitem__(self, index: int) -> Experiment:
+        return self._experiments[index]
+
+    def __iter__(self) -> Experiment:
         for experiment in self._experiments:
-            yield experiment.name, experiment.cellcycling
+            yield experiment #.name, experiment.cellcycling
+    
+    def __len__(self) -> int:
+        return len(self._experiments)
 
     @property
     def name(self) -> str:
@@ -337,7 +345,7 @@ class ExperimentContainer:
 
     @property
     def get_experiment_names(self) -> List[str]:
-        return [name for name, _ in self]
+        return [exp.name for exp in self]
 
     @property
     def hex_color(self) -> str:
@@ -346,14 +354,31 @@ class ExperimentContainer:
     @property
     def max_cycles_numbers(self) -> List[int]:
         numbers = []
-        for _, obj in self:
+        for exp in self:
+            obj = exp.cellcycling
             obj.get_numbers()
             numbers.append(obj._numbers[-1])
         return numbers
+    
+    def _update_capacity_retention(self) -> None:
+        self._capacity_retention = []
+
+        rexp, rcycle = self._reference
+        reference_capacity = self._experiments[rexp]._cycles[rcycle].discharge.capacity
+
+        for experiment in self._experiments:
+            buffer = []
+            for cycle in experiment.cycles:
+                if cycle.discharge:
+                    buffer.append(cycle.discharge.capacity / reference_capacity * 100)
+                else:
+                    buffer.append(None)
+            self._capacity_retention.append(buffer)
 
     def add_experiment(self, experiment: Experiment) -> None:
         if experiment not in self._experiments:
             self._experiments.append(experiment)
+            self._update_capacity_retention()
         else:
             raise RuntimeError
 
@@ -361,6 +386,7 @@ class ExperimentContainer:
         if name in [obj.name for obj in self._experiments]:
             id = [obj.name for obj in self._experiments].index(name)
             del self._experiments[id]
+            self._update_capacity_retention()
         else:
             raise ValueError
 
@@ -383,3 +409,25 @@ class ExperimentContainer:
                 break
 
         self._experiments[experiment_id].hide_cycle(cycle_id)
+        self._update_capacity_retention()
+
+    @property
+    def reference(self) -> List[int, int]:
+        return self._reference
+
+    @reference.setter
+    def reference(self, new_reference: List[int, int]) -> None:
+
+        if new_reference[0] < 0 or new_reference[0] >= len(self._experiments):
+            raise ValueError
+
+        if new_reference[1] < 0 or new_reference[1] >= len(
+            self._experiments[new_reference[0]]._cycles
+        ):
+            raise ValueError
+
+        self._reference = new_reference
+        self._update_capacity_retention()
+
+    def capacity_retention(self, experiment: int) -> List[float]:
+        return self._capacity_retention[experiment]
