@@ -66,87 +66,46 @@ def get_data_series(
 
     if option == "Capacity retention":
         return "Capacity retention (%)", container.capacity_retention(index)
+
     elif option == "Columbic efficiency":
         return "Columbic efficiency (%)", cellcycling.coulomb_efficiencies
+
     elif option == "Energy efficiency":
         return "Energy efficiency (%)", cellcycling.energy_efficiencies
+
     elif option == "Voltaic Efficiency":
         return "Voltaic Efficiency (%)", cellcycling.voltage_efficiencies
+
     elif option == "Total energy - Discharge":
         total_energies = [cycle.discharge.total_energy for cycle in cellcycling]
-        if volume is None and area is None:
-            return "discharge total energy (mWh)", total_energies
-        elif volume is not None and area is None:
-            normalized_energies = [energy / (1000 * volume) for energy in total_energies]
-            return "normalized discharge total energy (Wh/L)", normalized_energies
-        elif volume is None and area is not None:
-            normalized_energies = [energy / (1000 * area) for energy in total_energies]
-            return (
-                "normalized discharge total energy (Wh/cm<sup>2</sup>)",
-                normalized_energies,
-            )
-        elif volume is not None and area is not None:
-            normalized_energies = [
-                energy / (1000 * volume * area) for energy in total_energies
-            ]
-            return (
-                "normalized discharge total energy (Wh/L cm<sup>2</sup>)",
-                normalized_energies,
-            )
+        if volume is None:
+            return "Energy (mWh)", total_energies
         else:
-            raise RuntimeError
+            normalized_energies = [energy / (1000 * volume) for energy in total_energies]
+            return "Energy density (Wh/L)", normalized_energies
 
     elif option == "Total capacity - Discharge":
         total_capacities = [cycle.discharge.capacity for cycle in cellcycling]
 
-        if volume is None and area is None:
-            return "discharge total capacity (mAh)", total_capacities
-        elif volume is not None and area is None:
+        if volume is None:
+            return "Capacity (mAh)", total_capacities
+        else:
             normalized_energies = [
                 capacity / (1000 * volume) for capacity in total_capacities
             ]
-            return "normalized discharge total capacity (Ah/L)", normalized_energies
-        elif volume is None and area is not None:
-            normalized_energies = [
-                capacity / (1000 * area) for capacity in total_capacities
-            ]
-            return (
-                "normalized discharge total capacity (Ah/cm<sup>2</sup>)",
-                normalized_energies,
-            )
-        elif volume is not None and area is not None:
-            normalized_energies = [
-                capacity / (1000 * volume * area) for capacity in total_capacities
-            ]
-            return (
-                "normalized discharge total capacity (Ah/L cm<sup>2</sup>)",
-                normalized_energies,
-            )
-        else:
-            raise RuntimeError
+            return "Volumetric capacity (Ah/L)", normalized_energies
 
     elif option == "Average power - Discharge":
         average_powers = [cycle.discharge.power.mean() for cycle in cellcycling]
 
-        if volume is None and area is None:
-            return "average power (W)", average_powers
-        elif volume is not None and area is None:
-            average_powers = [power / volume for power in average_powers]
-            return "normalized average power (W/L)", average_powers
-        elif volume is None and area is not None:
-            average_powers = [power / area for power in average_powers]
-            return (
-                "normalized average power (W/cm<sup>2</sup>)",
-                average_powers,
-            )
-        elif volume is not None and area is not None:
-            average_powers = [power / (volume * area) for power in average_powers]
-            return (
-                "normalized average power (W/L cm<sup>2</sup>)",
-                average_powers,
-            )
+        if area is None:
+            return "Power (W)", average_powers
         else:
-            raise RuntimeError
+            average_powers = [1000*power / area for power in average_powers]
+            return (
+                "Power density (mW/cm<sup>2</sup>)",
+                average_powers,
+            )
 
     else:
         raise RuntimeError

@@ -64,66 +64,39 @@ def get_halfcycle_series(
             if not None will trigger the normalization of current, charge and energy per unit area
     """
     if title == "time":
-        return "time (s)", halfcycle.time
+        return "Time (s)", halfcycle.time
 
     elif title == "voltage":
-        return "voltage (V)", halfcycle.voltage
+        return "Voltage (V)", halfcycle.voltage
 
     elif title == "current":
         current = halfcycle.current
-        if volume is None and area is None:
-            return "current (A)", current
-        elif volume is not None and area is None:
-            return "normalized current (A/L)", current / volume
-        elif area is not None and volume is None:
-            return "normalized current (A/cm<sup>2</sup>)", current / area
-        elif area is not None and volume is not None:
-            return "normalized current (A/L cm<sup>2</sup>)", current / (volume * area)
+        if area is None:
+            return "Current (A)", current
         else:
-            raise RuntimeError
+            return "Current density (A/cm<sup>2</sup>)", current / area
+        
 
     elif title == "charge":
         charge = halfcycle.Q
-        if volume is None and area is None:
-            return "charge (mAh)", charge
-        elif volume is not None and area is None:
-            return "normalized charge (Ah/L)", charge / (1000 * volume)
-        elif area is not None and volume is None:
-            return "normalized charge (Ah/cm<sup>2</sup>)", charge / (1000 * area)
-        elif area is not None and volume is not None:
-            return "normalized charge (Ah/L cm<sup>2</sup>)", charge / (
-                1000 * volume * area
-            )
+        if volume is None :
+            return "Capacity (mAh)", charge
         else:
-            raise RuntimeError
+            return "Volumetric capacity (Ah/L)", charge / (1000 * volume)
 
     elif title == "power":
         power = halfcycle.power
-        if volume is None and area is None:
-            return "power (W)", power
-        elif volume is not None and area is None:
-            return "normalized power (W/L)", power / volume
-        elif area is not None and volume is None:
-            return "normalized power (W/cm<sup>2</sup>)", power / area
-        elif area is not None and volume is not None:
-            return "normalized power (W/L cm<sup>2</sup>)", power / (volume * area)
+        if area is None:
+            return "Power (W)", power
         else:
-            raise RuntimeError
+            return "Power density (mW/cm<sup>2</sup>)", 1000*power / area
 
     elif title == "energy":
         energy = halfcycle.energy
-        if volume is None and area is None:
-            return "energy (mWh)", energy
-        elif volume is not None and area is None:
-            return "normalized energy (Wh/L)", energy / (1000 * volume)
-        elif area is not None and volume is None:
-            return "normalized energy (Wh/cm<sup>2</sup>)", energy / (1000 * area)
-        elif area is not None and volume is not None:
-            return "normalized energy (Wh/L cm<sup>2</sup>)", energy / (
-                1000 * volume * area
-            )
+        if volume is None:
+            return "Energy (mWh)", energy
         else:
-            raise RuntimeError
+            return "Energy density (Wh/L)", energy / (1000 * volume)
 
     else:
         raise ValueError
