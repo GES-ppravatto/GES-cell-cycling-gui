@@ -9,7 +9,7 @@ from core.exceptions import DuplicateName
 
 class ProgramStatus:
     """
-    Service class used to moitor and save the relevant parameters of the GUI execution.
+    Service class used to monitor and save the relevant parameters of the GUI execution.
 
     Attributes
     ----------
