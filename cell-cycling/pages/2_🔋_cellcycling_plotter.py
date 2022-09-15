@@ -10,8 +10,6 @@ from core.experiment import Experiment, ExperimentContainer
 from core.utils import set_production_page_style, force_update_once
 from core.colors import get_plotly_color
 
-from echemsuite.cellcycling.cycles import CellCycling
-
 
 st.set_page_config(layout="wide")
 set_production_page_style()
@@ -1062,6 +1060,13 @@ try:
                                     logger.info(
                                         f"REMOVE experiments {get_experiment_names} from container {selected_container_name}"
                                     )
+
+                                    for name in get_experiment_names:
+                                        exp_index = selected_container.get_index_from_name(name)
+
+                                        if selected_container.reference[0] == exp_index:
+                                            selected_container.reference = [0, 0]
+
                                     for name in get_experiment_names:
                                         selected_container.remove_experiment(name)
                                     st.experimental_rerun()

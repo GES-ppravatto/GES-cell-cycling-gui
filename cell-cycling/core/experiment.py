@@ -346,6 +346,12 @@ class ExperimentContainer:
     @property
     def get_experiment_names(self) -> List[str]:
         return [exp.name for exp in self]
+    
+    def get_index_from_name(self, name:str) -> int:
+        if name not in self.get_experiment_names:
+            raise ValueError
+            
+        return self.get_experiment_names.index(name)
 
     @property
     def hex_color(self) -> str:
