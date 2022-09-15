@@ -235,6 +235,7 @@ def cell_cycling_plotter_widget(
                 pass
 
             with col2:
+                apply = False
                 if mode == "Add new":
                     apply = st.button(
                         "✅ Apply",
