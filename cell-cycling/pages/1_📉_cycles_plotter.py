@@ -362,6 +362,7 @@ try:
                                 [obj.number for obj in cycles],
                                 default=manual_selection_buffer,
                             )
+                            buffer_selection.sort()     # Sort the traces automatically
                             st.session_state[
                                 "Page2_ManualSelectorBuffer"
                             ] = buffer_selection
@@ -1278,7 +1279,7 @@ try:
                             f"-> Scale by area: {comparison_settings.scale_by_area}"
                         )
 
-                    with st.expander("Plot aspect oprions:"):
+                    with st.expander("Plot aspect options:"):
                         st.markdown("###### Aspect")
                         comparison_settings.font_size = int(
                             st.number_input(

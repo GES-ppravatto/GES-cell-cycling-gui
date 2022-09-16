@@ -268,6 +268,8 @@ def cell_cycling_plotter_widget(
             for container in available_containers:
                 for experiment in container._experiments:
                     experiment.unhide_all_cycles()
+            for container in available_containers:
+                container._update_capacity_retention()
 
     logger.info("Rendering Plot section")
     col1, col2 = st.columns([3.5, 1])

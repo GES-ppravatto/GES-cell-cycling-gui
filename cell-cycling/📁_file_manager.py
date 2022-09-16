@@ -138,8 +138,14 @@ try:
 
                         # If the selected action is "Add new experiment", add the object to the already available one
                         else:
-                            status[status.get_index_of(name)] += new_experiment
-                            logger.info(f"UPDATED experiment {name}")
+                            experiment = status[status.get_index_of(name)]
+
+                            if experiment.manager.instrument != new_experiment.manager.instrument:
+                                st.error("ERROR: Cannot join file from different instruments in a single experiment")
+                                logger.error(f"ERROR: Cannot join file from different instruments in a single experiment {name}")
+                            else:
+                                experiment += new_experiment
+                                logger.info(f"UPDATED experiment {name}")
 
                         # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
                         st.session_state["UploadConfirmation"][0] = new_experiment.name
