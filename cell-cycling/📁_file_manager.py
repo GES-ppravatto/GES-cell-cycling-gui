@@ -18,12 +18,13 @@ if "Token" not in st.session_state:
     st.session_state["Token"] = secrets.token_hex(4)
 
 @st.cache
-def init_logger():
+def init_logger(dump_log: bool = True):
     logger = logging.getLogger(__name__)
-    handler = logging.FileHandler(f'{st.session_state["Token"]}.log', mode="w")
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s [line: %(lineno)d]")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    if dump_log:
+        handler = logging.FileHandler(f'{st.session_state["Token"]}.log', mode="w")
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s [line: %(lineno)d]")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
     return logger
 
@@ -32,7 +33,7 @@ logger = init_logger()
 # Configure the session state for the first time with the data useful to completly describe
 # The current page
 if "ProgramStatus" not in st.session_state:
-    st.session_state["Version"] = "0.1.0"
+    st.session_state["Version"] = "0.1.1"
     st.session_state["Logger"] = logger
     st.session_state["ProgramStatus"] = ProgramStatus()
     st.session_state["UploadActionRadio"] = None
