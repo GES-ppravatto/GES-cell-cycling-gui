@@ -1,6 +1,6 @@
 numpy
 plotly
 palettable
-streamlit
+streamlit>=1.14.0
 kaleido
 streamlit-plotly-events

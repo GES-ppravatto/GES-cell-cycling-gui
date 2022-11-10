@@ -78,7 +78,7 @@ try:
             load_session_state(BytesIO(source.getvalue()))
             st.experimental_rerun()
 
-except st._RerunException:
+except st.runtime.scriptrunner.script_runner.RerunException:
     logger.info("EXPERIMENTAL RERUN CALLED")
     raise
 

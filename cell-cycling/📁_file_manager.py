@@ -727,7 +727,7 @@ try:
                 st.markdown("**Cycles report:**")
                 st.table(df)
 
-except st._RerunException:
+except st.runtime.scriptrunner.script_runner.RerunException:
     logger.info("EXPERIMENTAL RERUN CALLED")
     raise
 

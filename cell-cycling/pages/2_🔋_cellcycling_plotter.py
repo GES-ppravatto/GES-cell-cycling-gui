@@ -1159,7 +1159,7 @@ try:
         accessing this page."""
         )
 
-except st._RerunException:
+except st.runtime.scriptrunner.script_runner.RerunException:
     logger.info("EXPERIMENTAL RERUN CALLED")
     raise
 

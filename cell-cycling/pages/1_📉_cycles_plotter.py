@@ -1505,7 +1505,7 @@ try:
     logger.info("FORCING RERUN AT END OF PAGE")
     force_update_once()
 
-except st._RerunException:
+except st.runtime.scriptrunner.script_runner.RerunException:
     logger.info("EXPERIMENTAL RERUN CALLED")
     raise
 
