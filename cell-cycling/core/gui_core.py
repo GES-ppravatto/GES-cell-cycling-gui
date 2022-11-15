@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 import streamlit as st
 from typing import List, Union, Dict
@@ -9,7 +9,7 @@ from core.exceptions import DuplicateName
 
 class ProgramStatus:
     """
-    Service class used to moitor and save the relevant parameters of the GUI execution.
+    Service class used to monitor and save the relevant parameters of the GUI execution.
 
     Attributes
     ----------
@@ -240,7 +240,7 @@ class ExperimentSelector:
             # Else create a new default view labelling
             else:
                 self.view[name] = [CycleFormat(idx) for idx in cycles]
-    
+
     def empty_view(self, name: str):
         """
         Remove all the selected elements from a given view
@@ -254,7 +254,6 @@ class ExperimentSelector:
             self.view[name] = []
         else:
             raise RuntimeError
-
 
     def remove(self, name: str):
         """
@@ -370,6 +369,7 @@ class SingleCycleSeries:
     experiment_name: str
     cycle_id: int
     hex_color: str = None
+    color_from_base: bool = False
 
 
 @dataclass
@@ -377,6 +377,14 @@ class StackedPlotSettings:
 
     x_axis: str = None
     y_axis: str = None
+    x_autorange: bool = True
+    y_autorange: bool = True
+    x_range: List[float] = None
+    y_range: List[float] = None
+    custom_x_dticks: bool = False
+    custom_y_dticks: bool = False
+    x_dtick: float = None
+    y_dtick: float = None
     shared_x: bool = None
     scale_by_volume: bool = False
     scale_by_area: bool = False
@@ -384,6 +392,7 @@ class StackedPlotSettings:
     show_discharge: bool = True
     reverse: bool = False
     font_size: int = 14
+    axis_font_size: int = 18
     plot_height: int = 500
     format: str = None
     total_width: int = None
@@ -399,6 +408,8 @@ class ComparisonPlotSettings:
     show_charge: bool = True
     show_discharge: bool = True
     font_size: int = 14
+    axis_font_size: int = 18
+    reverse: bool = False
     height: int = 600
     format: str = None
     width: int = 1200
@@ -420,6 +431,16 @@ class CellcyclingPlotSettings:
     marker_with_border: str = False
     which_grid: str = None
     font_size: str = 14
+    axis_font_size: int = 18
     height: str = 600
     format: str = None
     width: str = 1200
+    limits: dict = field(
+        default_factory=lambda: {
+            "x": [None, None],
+            "y": [None, None],
+            "y2": [None, None],
+            "y_annotation_reference": [None, None],
+        }
+    )
+    annotations: dict = field(default_factory=lambda: {})

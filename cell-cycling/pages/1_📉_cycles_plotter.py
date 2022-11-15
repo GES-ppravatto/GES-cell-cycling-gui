@@ -1,10 +1,11 @@
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 import math, logging, sys, os, traceback, pickle
 import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from copy import deepcopy
 
 from core.gui_core import (
     ProgramStatus,
@@ -14,10 +15,13 @@ from core.gui_core import (
     ComparisonPlotSettings,
 )
 from core.experiment import Experiment
-from core.utils import set_production_page_style
+from core.utils import set_production_page_style, force_update_once
 from core.colors import get_plotly_color, RGB_to_HEX
 from echemsuite.cellcycling.cycles import HalfCycle
 
+
+st.set_page_config(layout="wide")
+set_production_page_style()
 
 # Fetch logger from the session state
 if "Logger" in st.session_state:
@@ -60,70 +64,83 @@ def get_halfcycle_series(
             if not None will trigger the normalization of current, charge and energy per unit area
     """
     if title == "time":
-        return "time (s)", halfcycle.time
+        return "Time (s)", halfcycle.time
 
     elif title == "voltage":
-        return "voltage (V)", halfcycle.voltage
+        return "Voltage (V)", halfcycle.voltage
 
     elif title == "current":
         current = halfcycle.current
-        if volume is None and area is None:
-            return "current (A)", current
-        elif volume is not None and area is None:
-            return "normalized current (A/L)", current / volume
-        elif area is not None and volume is None:
-            return "normalized current (A/cm<sup>2</sup>)", current / area
-        elif area is not None and volume is not None:
-            return "normalized current (A/L cm<sup>2</sup>)", current / (volume * area)
+        if area is None:
+            return "Current (A)", current
         else:
-            raise RuntimeError
+            return "Current density (A/cm<sup>2</sup>)", current / area
+        
 
     elif title == "charge":
         charge = halfcycle.Q
-        if volume is None and area is None:
-            return "charge (mAh)", charge
-        elif volume is not None and area is None:
-            return "normalized charge (Ah/L)", charge / (1000 * volume)
-        elif area is not None and volume is None:
-            return "normalized charge (Ah/cm<sup>2</sup>)", charge / (1000 * area)
-        elif area is not None and volume is not None:
-            return "normalized charge (Ah/L cm<sup>2</sup>)", charge / (
-                1000 * volume * area
-            )
+        if volume is None :
+            return "Capacity (mAh)", charge
         else:
-            raise RuntimeError
+            return "Volumetric capacity (Ah/L)", charge / (1000 * volume)
 
     elif title == "power":
         power = halfcycle.power
-        if volume is None and area is None:
-            return "power (W)", power
-        elif volume is not None and area is None:
-            return "normalized power (W/L)", power / volume
-        elif area is not None and volume is None:
-            return "normalized power (W/cm<sup>2</sup>)", power / area
-        elif area is not None and volume is not None:
-            return "normalized power (W/L cm<sup>2</sup>)", power / (volume * area)
+        if area is None:
+            return "Power (W)", power
         else:
-            raise RuntimeError
+            return "Power density (mW/cm<sup>2</sup>)", 1000*power / area
 
     elif title == "energy":
         energy = halfcycle.energy
-        if volume is None and area is None:
-            return "energy (mWh)", energy
-        elif volume is not None and area is None:
-            return "normalized energy (Wh/L)", energy / (1000 * volume)
-        elif area is not None and volume is None:
-            return "normalized energy (Wh/cm<sup>2</sup>)", energy / (1000 * area)
-        elif area is not None and volume is not None:
-            return "normalized energy (Wh/L cm<sup>2</sup>)", energy / (
-                1000 * volume * area
-            )
+        if volume is None:
+            return "Energy (mWh)", energy
         else:
-            raise RuntimeError
+            return "Energy density (Wh/L)", energy / (1000 * volume)
 
     else:
         raise ValueError
 
+
+# Create an instance of the ExperimentSelector class to be used to define the data to plot
+# and chache it in the session state
+if "Page2_CyclePlotSelection" not in st.session_state:
+    st.session_state["Page2_CyclePlotSelection"] = ExperimentSelector()
+    st.session_state["Page2_ManualSelectorBuffer"] = []
+    st.session_state["Page2_ComparisonPlot"] = []
+    st.session_state["Page2_stacked_settings"] = StackedPlotSettings()
+    st.session_state["Page2_comparison_settings"] = ComparisonPlotSettings()
+
+
+def clean_manual_selection_buffer():
+    st.session_state["Page2_ManualSelectorBuffer"] = []
+
+
+def remove_experiment_from_series_buffer(name: str) -> None:
+    """
+    Removes all the entry related to a given experiment from the selection buffer of the
+    comparison plot
+
+    Arguments
+    ---------
+    name : str
+        the name of the experiment to remove
+    """
+    selected_series: List[SingleCycleSeries] = st.session_state["Page2_ComparisonPlot"]
+    buffer = deepcopy(selected_series)
+    selected_series.clear()
+
+    for series in buffer:
+        if series.experiment_name != name:
+            selected_series.append(series)
+
+
+# Fetch a fresh instance of the Progam Status and Experiment Selection variables from the session state
+status: ProgramStatus = st.session_state["ProgramStatus"]
+selected_experiments: ExperimentSelector = st.session_state["Page2_CyclePlotSelection"]
+selected_series: List[SingleCycleSeries] = st.session_state["Page2_ComparisonPlot"]
+stacked_settings: StackedPlotSettings = st.session_state["Page2_stacked_settings"]
+comparison_settings: ComparisonPlotSettings = st.session_state["Page2_comparison_settings"]
 
 try:
 
@@ -138,30 +155,6 @@ try:
         status: ProgramStatus = st.session_state["ProgramStatus"]
         if len(status) == 0:
             enable = False
-
-    # Create an instance of the ExperimentSelector class to be used to define the data to plot
-    # and chache it in the session state
-    if "Page2_CyclePlotSelection" not in st.session_state:
-        st.session_state["Page2_CyclePlotSelection"] = ExperimentSelector()
-        st.session_state["Page2_ManualSelectorBuffer"] = []
-        st.session_state["Page2_ComparisonPlot"] = []
-        st.session_state["Page2_stacked_settings"] = StackedPlotSettings()
-        st.session_state["Page2_comparison_settings"] = ComparisonPlotSettings()
-
-    def clean_manual_selection_buffer():
-        st.session_state["Page2_ManualSelectorBuffer"] = []
-
-    # Fetch a fresh instance of the Progam Status and Experiment Selection variables from the session state
-    status: ProgramStatus = st.session_state["ProgramStatus"]
-    selected_experiments: ExperimentSelector = st.session_state["Page2_CyclePlotSelection"]
-    selected_series: List[SingleCycleSeries] = st.session_state["Page2_ComparisonPlot"]
-    stacked_settings: StackedPlotSettings = st.session_state["Page2_stacked_settings"]
-    comparison_settings: ComparisonPlotSettings = st.session_state[
-        "Page2_comparison_settings"
-    ]
-
-    st.set_page_config(layout="wide")
-    set_production_page_style()
 
     with st.sidebar:
         st.info(f'Session token: {st.session_state["Token"]}')
@@ -276,15 +269,21 @@ try:
                     # user can select the desired cycles
                     with col2:
 
+                        # Get the complete cycle list associated to the selected experiment
+                        id = status.get_index_of(current_view)
+                        cycles = status[id]._cycles
+
                         # Show the appropriate selection box
-                        if view_mode == "Constant-interval cycle selector":
+                        if (
+                            view_mode == "Constant-interval cycle selector"
+                            and len(cycles) > 1
+                        ):
 
                             logger.info("ENTERING contant-interval view selection mode")
 
                             st.markdown("###### Constant interval cycle selector")
 
-                            id = status.get_index_of(current_view)
-                            max_cycle = len(status[id].cycles) - 1
+                            max_cycle = len(cycles) - 1
 
                             # Show a number input to allow the selection of the start point
                             start = st.number_input(
@@ -321,11 +320,20 @@ try:
                             stride = int(stride)
                             logger.debug(f"-> stride: {stride}")
 
-                            apply = st.button("✅ Apply", key="comparison_apply")
+                            apply = st.button("✅ Apply", key="stacked_stride_apply")
                             if apply:
+                                logger.debug("-> Pressed apply button")
                                 cycles_in_view = np.arange(start, stop + 1, step=stride)
                                 selected_experiments.set(current_view, cycles_in_view)
                                 logger.info(f"SET view using cycles {cycles_in_view}")
+
+                        elif view_mode == "Constant-interval cycle selector":
+                            st.info(
+                                f"""`ADVICE ON MODE OF OPERATION: ` 
+                                The selected experiment has only {len(cycles)} cycle.
+                                Stride selection mode cannot be used in this instance. Please 
+                                select the *"Manual selector"* option in the *"Selector mode menu"*."""
+                            )
 
                         elif view_mode == "Manual cycle selector":
 
@@ -346,10 +354,6 @@ try:
                                 f"-> Temporary selection buffer: {manual_selection_buffer}"
                             )
 
-                            # Get the complete cycle list associated to the selected experiment
-                            id = status.get_index_of(current_view)
-                            cycles = status[id].cycles
-
                             # Show a multiple selection box with all the available cycles in which
                             # the user can manually add or remove a cycle, save the new list in a
                             # temporary buffer used on the proper rerun
@@ -358,6 +362,7 @@ try:
                                 [obj.number for obj in cycles],
                                 default=manual_selection_buffer,
                             )
+                            buffer_selection.sort()     # Sort the traces automatically
                             st.session_state[
                                 "Page2_ManualSelectorBuffer"
                             ] = buffer_selection
@@ -435,107 +440,130 @@ try:
 
                     st.markdown("#### Plot options")
 
-                    st.markdown("###### Axis")
-                    stacked_settings.x_axis = st.selectbox(
-                        "Select the series x axis",
-                        HALFCYCLE_SERIES,
-                        index=HALFCYCLE_SERIES.index(stacked_settings.x_axis)
-                        if stacked_settings.x_axis
-                        else 0,
-                    )
-                    logger.debug(f"-> X axis: {stacked_settings.x_axis}")
-
-                    sub_HALFCYCLE_SERIES = [
-                        x for x in HALFCYCLE_SERIES if x != stacked_settings.x_axis
-                    ]
-                    stacked_settings.y_axis = st.selectbox(
-                        "Select the series y axis",
-                        sub_HALFCYCLE_SERIES,
-                        index=sub_HALFCYCLE_SERIES.index(stacked_settings.y_axis)
-                        if stacked_settings.y_axis
-                        and stacked_settings.y_axis in sub_HALFCYCLE_SERIES
-                        else 0,
-                    )
-                    logger.debug(f"-> Y axis: {stacked_settings.y_axis}")
-
-                    stacked_settings.shared_x = st.checkbox(
-                        "Use shared x-axis",
-                        value=stacked_settings.shared_x
-                        if stacked_settings.shared_x and len(selected_experiments) == 1
-                        else False,
-                        disabled=True if len(selected_experiments) == 1 else False,
-                    )
-                    logger.debug(f"-> Shared X mode: {stacked_settings.shared_x}")
-
-                    volume_is_available = True
-                    for name in selected_experiments.view.keys():
-                        experiment_id = status.get_index_of(name)
-                        experiment = status[experiment_id]
-                        if experiment.volume is None:
-                            volume_is_available = False
-                            break
-
-                    stacked_settings.scale_by_volume = st.checkbox(
-                        "Scale values by volume",
-                        value=stacked_settings.scale_by_volume
-                        if volume_is_available
-                        else False,
-                        disabled=not volume_is_available,
-                    )
-                    logger.debug(f"-> Scale by volume: {stacked_settings.scale_by_volume}")
-
-                    area_is_available = True
-                    for name in selected_experiments.view.keys():
-                        experiment_id = status.get_index_of(name)
-                        experiment = status[experiment_id]
-                        if experiment.area is None:
-                            area_is_available = False
-                            break
-
-                    stacked_settings.scale_by_area = st.checkbox(
-                        "Scale values by area",
-                        value=stacked_settings.scale_by_area
-                        if area_is_available
-                        else False,
-                        disabled=not area_is_available,
-                    )
-                    logger.debug(f"-> Scale by area: {stacked_settings.scale_by_area}")
-
-                    st.markdown("###### Series")
-                    stacked_settings.show_charge = st.checkbox(
-                        "Show charge", value=stacked_settings.show_charge
-                    )
-                    logger.debug(f"-> Show charge: {stacked_settings.show_charge}")
-
-                    stacked_settings.show_discharge = st.checkbox(
-                        "Show discharge", value=stacked_settings.show_discharge
-                    )
-                    logger.debug(f"-> Show discharge: {stacked_settings.show_discharge}")
-
-                    st.markdown("###### Aspect")
-                    stacked_settings.reverse = st.checkbox(
-                        "Reversed colorscale", value=stacked_settings.reverse
-                    )
-                    logger.debug(f"-> Reversed colorscale: {stacked_settings.reverse}")
-
-                    stacked_settings.font_size = int(
-                        st.number_input(
-                            "Label font size",
-                            min_value=4,
-                            value=stacked_settings.font_size,
+                    with st.expander("Axis options:"):
+                        st.markdown("###### Axis")
+                        stacked_settings.x_axis = st.selectbox(
+                            "Select the series x axis",
+                            HALFCYCLE_SERIES,
+                            index=HALFCYCLE_SERIES.index(stacked_settings.x_axis)
+                            if stacked_settings.x_axis
+                            else 0,
                         )
-                    )
-                    logger.debug(f"-> Font size: {stacked_settings.font_size}")
+                        logger.debug(f"-> X axis: {stacked_settings.x_axis}")
 
-                    stacked_settings.plot_height = int(
-                        st.number_input(
-                            "Subplot height",
-                            min_value=10,
-                            value=stacked_settings.plot_height,
-                            step=10,
+                        sub_HALFCYCLE_SERIES = [
+                            x for x in HALFCYCLE_SERIES if x != stacked_settings.x_axis
+                        ]
+                        stacked_settings.y_axis = st.selectbox(
+                            "Select the series y axis",
+                            sub_HALFCYCLE_SERIES,
+                            index=sub_HALFCYCLE_SERIES.index(stacked_settings.y_axis)
+                            if stacked_settings.y_axis
+                            and stacked_settings.y_axis in sub_HALFCYCLE_SERIES
+                            else 0,
                         )
-                    )
-                    logger.debug(f"-> Plot height: {stacked_settings.plot_height}")
+                        logger.debug(f"-> Y axis: {stacked_settings.y_axis}")
+
+                        stacked_settings.shared_x = st.checkbox(
+                            "Use shared x-axis",
+                            value=stacked_settings.shared_x
+                            if stacked_settings.shared_x and len(selected_experiments) == 1
+                            else False,
+                            disabled=True if len(selected_experiments) == 1 else False,
+                        )
+                        logger.debug(f"-> Shared X mode: {stacked_settings.shared_x}")
+
+                        volume_is_available = True
+                        for name in selected_experiments.view.keys():
+                            experiment_id = status.get_index_of(name)
+                            experiment = status[experiment_id]
+                            if experiment.volume is None:
+                                volume_is_available = False
+                                break
+
+                        stacked_settings.scale_by_volume = st.checkbox(
+                            "Scale values by volume",
+                            value=stacked_settings.scale_by_volume
+                            if volume_is_available
+                            else False,
+                            disabled=not volume_is_available,
+                        )
+                        logger.debug(
+                            f"-> Scale by volume: {stacked_settings.scale_by_volume}"
+                        )
+
+                        area_is_available = True
+                        for name in selected_experiments.view.keys():
+                            experiment_id = status.get_index_of(name)
+                            experiment = status[experiment_id]
+                            if experiment.area is None:
+                                area_is_available = False
+                                break
+
+                        stacked_settings.scale_by_area = st.checkbox(
+                            "Scale values by area",
+                            value=stacked_settings.scale_by_area
+                            if area_is_available
+                            else False,
+                            disabled=not area_is_available,
+                        )
+                        logger.debug(f"-> Scale by area: {stacked_settings.scale_by_area}")
+
+                    with st.expander("Series options:"):
+                        st.markdown("###### Series")
+                        stacked_settings.show_charge = st.checkbox(
+                            "Show charge", value=stacked_settings.show_charge
+                        )
+                        logger.debug(f"-> Show charge: {stacked_settings.show_charge}")
+
+                        stacked_settings.show_discharge = st.checkbox(
+                            "Show discharge", value=stacked_settings.show_discharge
+                        )
+                        logger.debug(
+                            f"-> Show discharge: {stacked_settings.show_discharge}"
+                        )
+
+                    with st.expander("Aspect options:"):
+                        st.markdown("###### Aspect")
+
+                        stacked_settings.reverse = st.checkbox(
+                            "Reversed colorscale",
+                            value=stacked_settings.reverse,
+                            key="stacked_reverse",
+                        )
+                        logger.debug(f"-> Reversed colorscale: {stacked_settings.reverse}")
+
+                        stacked_settings.font_size = int(
+                            st.number_input(
+                                "Label/tick font size",
+                                min_value=4,
+                                value=stacked_settings.font_size,
+                            )
+                        )
+                        logger.debug(
+                            f"-> Label/tick font size: {stacked_settings.font_size}"
+                        )
+
+                        stacked_settings.axis_font_size = int(
+                            st.number_input(
+                                "Axis title font size",
+                                min_value=4,
+                                value=stacked_settings.axis_font_size,
+                            )
+                        )
+                        logger.debug(
+                            f"-> Axis font size: {stacked_settings.axis_font_size}"
+                        )
+
+                        stacked_settings.plot_height = int(
+                            st.number_input(
+                                "Subplot height",
+                                min_value=10,
+                                value=stacked_settings.plot_height,
+                                step=10,
+                            )
+                        )
+                        logger.debug(f"-> Plot height: {stacked_settings.plot_height}")
 
                 with col1:
 
@@ -546,7 +574,7 @@ try:
                         cols=1,
                         rows=len(selected_experiments),
                         shared_xaxes=stacked_settings.shared_x,
-                        vertical_spacing=0.01 if stacked_settings.shared_x else None,
+                        vertical_spacing=0 if stacked_settings.shared_x else None,
                     )
 
                     x_label, y_label = None, None
@@ -559,7 +587,7 @@ try:
                         # Get the cycle list from the experiment
                         exp_id = status.get_index_of(name)
                         experiment: Experiment = status[exp_id]
-                        cycles = experiment.cycles
+                        cycles = experiment._cycles
                         volume = (
                             experiment.volume if stacked_settings.scale_by_volume else None
                         )
@@ -643,7 +671,14 @@ try:
                             linecolor="black",
                             gridwidth=1,
                             gridcolor="#DDDDDD",
+                            title_font={"size": stacked_settings.axis_font_size},
+                            range=stacked_settings.x_range,
+                            dtick = stacked_settings.x_dtick,
                         )
+
+                        if stacked_settings.shared_x:
+                            for n in range(len(selected_experiments)):
+                                fig.update_xaxes(title_text="", row=n, col=1)
 
                         # Update the settings of the y-axis
                         fig.update_yaxes(
@@ -652,6 +687,9 @@ try:
                             linecolor="black",
                             gridwidth=1,
                             gridcolor="#DDDDDD",
+                            title_font={"size": stacked_settings.axis_font_size},
+                            range=stacked_settings.y_range,
+                            dtick = stacked_settings.y_dtick,
                         )
 
                         # Update the settings of plot layout
@@ -669,49 +707,219 @@ try:
 
                     logger.info("Re-Entering plot option section to render export section")
 
-                    st.markdown("###### Export")
-                    available_formats = ["png", "jpeg", "svg", "pdf"]
-                    stacked_settings.format = st.selectbox(
-                        "Select the format of the file",
-                        available_formats,
-                        index=available_formats.index(stacked_settings.format)
-                        if stacked_settings.format
-                        else 0,
-                    )
-                    logger.debug(f"-> Export format: {stacked_settings.format}")
+                    # Define a expander to hold the options relative to the plot range and ticks
+                    with st.expander("Range/ticks options"):
+                        st.markdown("###### Range options")
 
-                    suggested_width = int(2.5 * stacked_settings.plot_height)
-                    stacked_settings.total_width = int(
-                        st.number_input(
-                            "Total width",
-                            min_value=10,
-                            value=stacked_settings.total_width
-                            if stacked_settings.total_width
-                            else suggested_width,
+                        # Show a checkbox to enable/disable automatic axis range
+                        st.markdown("X-axis range")
+                        x_autorange = st.checkbox(
+                            "Use automatic range for X", value=stacked_settings.x_autorange
                         )
-                    )
-                    logger.debug(f"-> Export width: {stacked_settings.total_width}")
+                        logger.debug(f"-> X Autorange: {x_autorange}")
 
-                    # Set new layout options to account for the user selected width
-                    fig.update_layout(
-                        plot_bgcolor="#FFFFFF",
-                        height=stacked_settings.plot_height
-                        * len(selected_experiments.names),
-                        width=stacked_settings.total_width,
-                        font=dict(size=stacked_settings.font_size),
-                    )
+                        if x_autorange != stacked_settings.x_autorange:
+                            stacked_settings.x_autorange = x_autorange
+                            stacked_settings.x_range = None
+                            logger.info(f"X Autorange: {stacked_settings.x_autorange}")
+                            st.experimental_rerun()
 
-                    st.download_button(
-                        "Download plot",
-                        data=fig.to_image(format=stacked_settings.format),
-                        file_name=f"cycle_plot.{stacked_settings.format}",
-                        on_click=lambda msg: logger.info(msg),
-                        args=[f"DOWNLOAD cycle_plot.{stacked_settings.format}"],
-                        disabled=True
-                        if not stacked_settings.show_charge
-                        and not stacked_settings.show_discharge
-                        else False,
-                    )
+                        # If autorange is set to false and no range is available get the 
+                        # starting values for the range according to the automatic ones
+                        if (
+                            stacked_settings.x_autorange is False
+                            and stacked_settings.x_range is None
+                        ):
+                            figure_data = fig.full_figure_for_development(warn=False)
+                            xmin, xmax = None, None
+                            for i in range(0, len(selected_experiments)):
+                                label = "xaxis" if i == 0 else f"xaxis{i+1}"
+                                xrange = [float(x) for x in figure_data.layout[label].range]
+                                xmin = xrange[0] if xmin is None else min(xmin, xrange[0])
+                                xmax = xrange[1] if xmax is None else max(xmax, xrange[1])
+                            stacked_settings.x_range = [float(xmin), float(xmax)]
+                            logger.info(f"SET x range: {stacked_settings.x_range}")
+                        
+                        # If the autorange is false get the user input about the desired range
+                        # and save it in the sesison state
+                        if stacked_settings.x_autorange is False:
+
+                            xmin, xmax = stacked_settings.x_range
+                            xmin = float(st.number_input("X-min", value=xmin, step=0.01))
+                            xmax = float(st.number_input("X-max", value=xmax, step=0.01))
+                            xrange = [xmin, xmax]
+
+                            if xrange != stacked_settings.x_range:
+                                stacked_settings.x_range = xrange
+                                logger.info(f"SET x range: {stacked_settings.x_range}")
+                                st.experimental_rerun()
+
+                        # If the autorange is false deactivate custom ticks
+                        else:
+                            stacked_settings.custom_x_dticks = False
+                        
+                        # Show a checkbox to enable custom axis tick
+                        stacked_settings.custom_x_dticks = st.checkbox(
+                            "Use custom X ticks intervals",
+                            value=stacked_settings.custom_x_dticks,
+                            disabled=stacked_settings.x_autorange,
+                        )
+                        logger.info(
+                            f"Use custom X ticks: {stacked_settings.custom_x_dticks}"
+                        )
+
+                        # If the custom tick option is enable get user input
+                        if stacked_settings.custom_x_dticks:
+                            
+                            # If no default value is set, compute one based on the range
+                            if stacked_settings.x_dtick is None:
+                                x_range = stacked_settings.x_range
+                                stacked_settings.x_dtick = float(
+                                    (x_range[1] - x_range[0]) / 10.0
+                                )
+                                logger.debug(f"-> Setting X dtick default: {stacked_settings.x_dtick}")
+
+                            # Get user input
+                            stacked_settings.x_dtick = float(
+                                st.number_input(
+                                    "X tick interval",
+                                    value=stacked_settings.x_dtick,
+                                    step=1e-3,
+                                )
+                            )
+                            logger.info(f"SET X dtick: {stacked_settings.x_dtick}")
+
+                        # If custom x dtick option is false celar the selected dtick value
+                        elif stacked_settings.x_dtick is not None:
+                            stacked_settings.x_dtick = None
+
+                        st.markdown("Y-axis range")
+
+                        # Show a checkbox to enable/disable automatic axis range
+                        y_autorange = st.checkbox(
+                            "Use automatic range for Y", value=stacked_settings.y_autorange
+                        )
+                        logger.debug(f"-> Y Autorange: {y_autorange}")
+
+                        if y_autorange != stacked_settings.y_autorange:
+                            stacked_settings.y_autorange = y_autorange
+                            stacked_settings.y_range = None
+                            logger.info(f"Y Autorange: {stacked_settings.y_autorange}")
+                            st.experimental_rerun()
+
+                        # If autorange is set to false and no range is available get the 
+                        # starting values for the range according to the automatic ones
+                        if (
+                            stacked_settings.y_autorange is False
+                            and stacked_settings.y_range is None
+                        ):
+
+                            figure_data = fig.full_figure_for_development(warn=False)
+
+                            ymin, ymax = None, None
+                            for i in range(len(selected_experiments)):
+                                label = "yaxis" if i == 0 else f"yaxis{i+1}"
+                                yrange = [float(y) for y in figure_data.layout[label].range]
+                                ymin = yrange[0] if ymin is None else min(ymin, yrange[0])
+                                ymax = yrange[1] if ymax is None else max(ymax, yrange[1])
+                            stacked_settings.y_range = [float(ymin), float(ymax)]
+                        
+                        # If the autorange is false get the user input about the desired range
+                        # and save it in the sesison state
+                        if stacked_settings.y_autorange is False:
+
+                            ymin, ymax = stacked_settings.y_range
+                            ymin = float(st.number_input("Y-min", value=ymin, step=0.01))
+                            ymax = float(st.number_input("Y-max", value=ymax, step=0.01))
+                            yrange = [ymin, ymax]
+
+                            if yrange != stacked_settings.y_range:
+                                stacked_settings.y_range = yrange
+                                logger.info(f"Y range set to: {stacked_settings.y_range}")
+                                st.experimental_rerun()
+
+                        # If the autorange is false deactivate custom ticks
+                        else:
+                            stacked_settings.custom_y_dticks = False
+
+                        # Show a checkbox to enable custom axis tick
+                        stacked_settings.custom_y_dticks = st.checkbox(
+                            "Use custom Y ticks intervals",
+                            value=stacked_settings.custom_y_dticks,
+                            disabled=stacked_settings.y_autorange,
+                        )
+                        logger.info(
+                            f"Use custom Y ticks: {stacked_settings.custom_y_dticks}"
+                        )
+
+                        # If the custom tick option is enable get user input
+                        if stacked_settings.custom_y_dticks:
+                            
+                            # If no default value is set, compute one based on the range
+                            if stacked_settings.y_dtick is None:
+                                y_range = stacked_settings.y_range
+                                stacked_settings.y_dtick = float(
+                                    (y_range[1] - y_range[0]) / 5
+                                )
+                            
+                            # Get user input
+                            stacked_settings.y_dtick = float(
+                                st.number_input(
+                                    "Y tick interval",
+                                    value=stacked_settings.y_dtick,
+                                    step=1e-3,
+                                )
+                            )
+                            logger.info(f"SET Y dtick: {stacked_settings.x_dtick}")
+
+                         # If custom y dtick option is false celar the selected dtick value
+                        elif stacked_settings.y_dtick is not None:
+                            stacked_settings.y_dtick = None
+
+                    with st.expander("Export options:"):
+                        st.markdown("###### Export")
+                        available_formats = ["png", "jpeg", "svg", "pdf"]
+                        stacked_settings.format = st.selectbox(
+                            "Select the format of the file",
+                            available_formats,
+                            index=available_formats.index(stacked_settings.format)
+                            if stacked_settings.format
+                            else 0,
+                        )
+                        logger.debug(f"-> Export format: {stacked_settings.format}")
+
+                        suggested_width = int(2.5 * stacked_settings.plot_height)
+                        stacked_settings.total_width = int(
+                            st.number_input(
+                                "Total width",
+                                min_value=10,
+                                value=stacked_settings.total_width
+                                if stacked_settings.total_width
+                                else suggested_width,
+                            )
+                        )
+                        logger.debug(f"-> Export width: {stacked_settings.total_width}")
+
+                        # Set new layout options to account for the user selected width
+                        fig.update_layout(
+                            plot_bgcolor="#FFFFFF",
+                            height=stacked_settings.plot_height
+                            * len(selected_experiments.names),
+                            width=stacked_settings.total_width,
+                            font=dict(size=stacked_settings.font_size),
+                        )
+
+                        st.download_button(
+                            "Download plot",
+                            data=fig.to_image(format=stacked_settings.format),
+                            file_name=f"cycle_plot.{stacked_settings.format}",
+                            on_click=lambda msg: logger.info(msg),
+                            args=[f"DOWNLOAD cycle_plot.{stacked_settings.format}"],
+                            disabled=True
+                            if not stacked_settings.show_charge
+                            and not stacked_settings.show_discharge
+                            else False,
+                        )
 
         # Define a comparison plot tab to compare cycle belonging to different experiments
         with comparison_plot:
@@ -719,113 +927,279 @@ try:
             logger.info("Rendering comparison plot tab")
 
             # Create a manager section allowing the user to select the trace to plot based on
-            # the experiment name and the cycle number
-            col1, col2, col3 = st.columns([2, 2, 1])
+            # the experiment name and the cycle number or using a stride base selection
+            with st.expander("Series editor"):
 
-            with col1:
-                experiment_name = st.selectbox(
-                    "Select the experiment",
-                    status.get_experiment_names(),
-                )
-                logger.debug(f"-> Selected experiment: {experiment_name}")
+                st.markdown("### Experiment selector")
 
-            with col2:
-                exp_idx = status.get_index_of(experiment_name)
-                experiment = status[exp_idx]
+                col1, col2 = st.columns(2)
 
-                exclude = [
-                    entry.cycle_id
-                    for entry in selected_series
-                    if entry.experiment_name == experiment_name
-                ]
-
-                numbers = [obj.number for obj in experiment.cycles]
-
-                cycle_number = st.selectbox(
-                    "Select the cycle",
-                    [n for n in numbers if n not in exclude],
-                )
-                logger.debug(f"-> Selected cycle: {cycle_number}")
-
-                cycle = experiment.cycles[numbers.index(cycle_number)]
-
-            with col3:
-                st.write("")
-                st.write("")
-                add = st.button("➕ Add", key="comparison")
-
-                if add:
-                    logger.info(
-                        f"ADD cycle {cycle_number} from experiment {experiment_name} to comparison plot"
+                with col1:
+                    st.markdown("##### Source experiment")
+                    experiment_name = st.selectbox(
+                        "Select the experiment",
+                        status.get_experiment_names(),
                     )
-                    selected_series.append(
-                        SingleCycleSeries(
-                            f"{experiment_name} [{cycle_number}]",
-                            experiment_name,
-                            cycle_number,
-                            hex_color=get_plotly_color(len(selected_series)),
-                        )
+                    exp_idx = status.get_index_of(experiment_name)
+                    experiment = status[exp_idx]
+                    cycle_numbers = [obj.number for obj in experiment._cycles]
+
+                    logger.debug(f"-> Selected experiment: {experiment_name}")
+
+                    use_base_color = st.checkbox("Use experiment base color", value=True)
+                    logger.debug(f"-> Using basecolor from experiment: {use_base_color}")
+
+                    clear_experiment = st.button(
+                        "🧹 Remove from plot", key="Experiment_series_remove"
                     )
-                    st.experimental_rerun()
 
-            # Create a setup section to define the series to visualize and their color/name
-            if selected_series != []:
+                    st.markdown("##### Selector mode")
+                    selector_mode = st.radio(
+                        "Select the cycle selector mode",
+                        ["Stride based selector", "Manual selector", "Series editor"],
+                    )
 
-                with st.expander("Series options:", expanded=True):
-
-                    logger.info("Entering series option menu")
-
-                    cleft, cright = st.columns(2)
-
-                    with cleft:
-                        logger.info("Entering series selection menu")
-
-                        st.markdown("##### Series selection")
-                        available_labels = [entry.label for entry in selected_series]
-
-                        series_label = st.selectbox(
-                            "Select series to edit", available_labels
+                    if clear_experiment:
+                        logger.info(
+                            f"REMOVING experiment {experiment_name} from selection buffer"
                         )
-                        logger.debug(f"-> Selected series to edit {series_label}")
+                        remove_experiment_from_series_buffer(experiment_name)
+                        st.experimental_rerun()
 
-                        series_position = available_labels.index(series_label)
-                        current_series = selected_series[series_position]
+                with col2:
+                    if selector_mode == "Stride based selector" and len(cycle_numbers) > 1:
 
-                        remove = st.button("➖ Remove from selection")
-                        if remove:
-                            logger.info(f"REMOVED series {series_label} form selection")
-                            del selected_series[series_position]
-                            st.experimental_rerun()
+                        logger.info("Entering stride bases selection mode")
+                        st.markdown("##### Stride-based cycle selector")
 
-                        st.markdown("---")
+                        max_cycle = len(cycle_numbers) - 1
 
-                        st.markdown("###### Current selection")
-                        st.markdown(f"Experiment: `{experiment_name}`")
-                        st.markdown(f"Cycle: `{cycle_number}`")
-
-                    with cright:
-                        logger.info("Entering series edit menu")
-
-                        st.markdown("##### Series options")
-
-                        new_label = st.text_input(
-                            "Select the series name", value=series_label
+                        label_prefix = st.text_input(
+                            "Select a label prefix for the selected series",
+                            value=experiment_name,
                         )
-                        logger.debug(f"-> New label name: {new_label}")
+                        logger.debug(f"-> Selected label prefix: {label_prefix}")
 
-                        new_color = st.color_picker(
-                            "Select the series color", value=current_series.hex_color
+                        # Show a number input to allow the selection of the start point
+                        start = st.number_input(
+                            "Start",
+                            min_value=0,
+                            max_value=max_cycle - 1,
+                            step=1,
+                            key="comparison_start",
                         )
-                        logger.debug(f"-> New color name: {new_label}")
+                        start = int(start)
+                        logger.debug(f"-> start: {start}")
 
-                        apply = st.button("✅ Apply", key="Apply_coparison_plot")
+                        # Show a number input to allow the selection of the stop point, please
+                        # notice how the stop point is excluded from the interval and, as such,
+                        # must be allowed to assume a maximum value equal to the last index +1
+                        stop = st.number_input(
+                            "Stop (included)",
+                            min_value=start + 1,
+                            max_value=max_cycle,
+                            value=max_cycle,
+                            step=1,
+                            key="comparison_stop",
+                        )
+                        stop = int(stop)
+                        logger.debug(f"-> stop: {stop}")
+
+                        guess_stride = int(math.ceil(max_cycle / 10))
+                        # Show a number input to allow the selection of the stride
+                        stride = st.number_input(
+                            "Stride",
+                            min_value=1,
+                            max_value=max_cycle,
+                            step=1,
+                            value=guess_stride,
+                            key="comparison_stride",
+                        )
+                        stride = int(stride)
+                        logger.debug(f"-> stride: {stride}")
+
+                        apply = st.button("✅ Apply", key="comparison_stride_apply")
+
                         if apply:
-                            logger.info(
-                                f"SET name {new_label} and color {new_color} to series {series_label}"
-                            )
-                            current_series.label = new_label
-                            current_series.hex_color = new_color
+                            logger.debug("-> Pressed apply button")
+
+                            remove_experiment_from_series_buffer(experiment_name)
+
+                            cycles_in_selection = np.arange(start, stop + 1, step=stride)
+                            for n in cycles_in_selection:
+                                cycle = experiment._cycles[cycle_numbers.index(n)]
+
+                                duplicate = False
+                                for series in selected_series:
+                                    if (
+                                        series.experiment_name == experiment_name
+                                        and series.cycle_id == n
+                                    ):
+                                        duplicate = True
+                                        break
+                                if duplicate:
+                                    continue
+
+                                selected_series.append(
+                                    SingleCycleSeries(
+                                        f"{label_prefix} [{n}]",
+                                        experiment_name,
+                                        n,
+                                        hex_color=get_plotly_color(len(selected_series)),
+                                        color_from_base=use_base_color,
+                                    )
+                                )
+                            # logger.info(f"Selection buffer set to: {selected_series}")
                             st.experimental_rerun()
+
+                    elif selector_mode == "Stride based selector":
+                        st.info(
+                            f"""`ADVICE ON MODE OF OPERATION: ` 
+                            The selected experiment has only {len(cycle_numbers)} cycle.
+                            Stride selection mode cannot be used in this instance. Please 
+                            select the *"Manual selector"* option in the *"Selector mode menu"*."""
+                        )
+
+                    elif selector_mode == "Manual selector":
+                        logger.info("Entering manual selection mode")
+                        st.markdown("##### Manual cycle selector")
+
+                        multiple = st.checkbox("Use multiple selection", value=True)
+                        logger.debug(f"-> Multiple selector set to: {multiple}")
+
+                        exclude = [
+                            entry.cycle_id
+                            for entry in selected_series
+                            if entry.experiment_name == experiment_name
+                        ]
+
+                        selected_cycles = {}
+                        if multiple:
+                            logger.info("Entering multiple cycle selector")
+                            cycle_numbers = st.multiselect(
+                                "Select the cycle",
+                                [n for n in cycle_numbers if n not in exclude],
+                            )
+                            logger.debug(f"-> Selected cycles: {cycle_numbers}")
+
+                            label_prefix = st.text_input(
+                                "Select a label prefix for the selected series",
+                                value=experiment_name,
+                            )
+                            logger.debug(f"-> Selected label prefix: {label_prefix}")
+
+                            for n in cycle_numbers:
+                                selected_cycles[f"{label_prefix} [{n}]"] = n
+
+                        else:
+                            logger.info("Entering single cycle selector")
+                            cycle_number = st.selectbox(
+                                "Select the cycle",
+                                [n for n in cycle_numbers if n not in exclude],
+                            )
+                            logger.debug(f"-> Selected cycle: {cycle_number}")
+
+                            cycle_label = st.text_input(
+                                "Select a label for the selected series",
+                                value=f"{experiment_name} [{cycle_number}]",
+                            )
+                            logger.debug(f"-> Selected label: {cycle_label}")
+                            selected_cycles[cycle_label] = cycle_number
+
+                        add = st.button("➕ Add", key="comparison")
+
+                        if add:
+                            for label, n in selected_cycles.items():
+
+                                logger.info(
+                                    f"ADD cycle {n} from experiment {experiment_name} to comparison plot"
+                                )
+
+                                cycle = experiment._cycles[cycle_numbers.index(n)]
+                                selected_series.append(
+                                    SingleCycleSeries(
+                                        label,
+                                        experiment_name,
+                                        n,
+                                        hex_color=get_plotly_color(len(selected_series)),
+                                        color_from_base=use_base_color,
+                                    )
+                                )
+
+                            st.experimental_rerun()
+
+                    elif selector_mode == "Series editor":
+
+                        logger.info("Entering series option menu")
+                        st.markdown("##### Series editor")
+
+                        if selected_series != []:
+                            logger.debug(f"-> {len(selected_series)} series found")
+
+                            available_labels = [entry.label for entry in selected_series]
+
+                            series_label = st.selectbox(
+                                "Select series to edit", available_labels
+                            )
+                            logger.debug(f"-> Selected series to edit {series_label}")
+
+                            series_position = available_labels.index(series_label)
+                            current_series = selected_series[series_position]
+
+                            st.write(f"Experiment name: `{current_series.experiment_name}`")
+                            st.write(f"Cycle number: `{current_series.cycle_id}`")
+
+                            remove = st.button(
+                                "🧹 Remove from plot", key="Single_series_remove"
+                            )
+                            if remove:
+                                logger.info(f"REMOVED series {series_label} form selection")
+                                del selected_series[series_position]
+                                st.experimental_rerun()
+
+                            logger.info("Entering series edit menu")
+                            st.markdown("##### Options:")
+
+                            new_label = st.text_input(
+                                "Select the series name", value=series_label
+                            )
+                            logger.debug(f"-> New label name: {new_label}")
+
+                            override_color = st.checkbox(
+                                "Override base color",
+                                value=False if current_series.color_from_base else True,
+                                disabled=False if current_series.color_from_base else True,
+                            )
+
+                            new_color = st.color_picker(
+                                "Select the series color",
+                                value=current_series.hex_color,
+                                disabled=False if override_color else True,
+                            )
+                            logger.debug(f"-> New color name: {new_label}")
+
+                            apply = st.button("✅ Apply", key="Apply_coparison_plot")
+                            if apply:
+                                logger.info(
+                                    f"SET name {new_label} and color {new_color} to series {series_label}"
+                                )
+                                current_series.label = new_label
+                                current_series.hex_color = new_color
+                                if override_color:
+                                    current_series.color_from_base = False
+                                st.experimental_rerun()
+
+                        else:
+                            logger.debug(f"-> No series found")
+                            st.warning("No series loaded to edit")
+
+                    else:
+                        raise RuntimeError
+
+            logger.info(f"Currently selected series: {selected_series}")
+
+            # Enter the plot section
+            if selected_series != []:
 
                 col1, col2 = st.columns([4, 1])
 
@@ -837,93 +1211,119 @@ try:
 
                     st.markdown("#### Plot options")
 
-                    st.markdown("###### Axis")
-                    comparison_settings.x_axis = st.selectbox(
-                        "Select the series x axis",
-                        HALFCYCLE_SERIES,
-                        key="x_comparison",
-                        index=HALFCYCLE_SERIES.index(comparison_settings.x_axis)
-                        if comparison_settings.x_axis
-                        else 0,
-                    )
-                    logger.debug(f"-> X axis: {comparison_settings.x_axis}")
-
-                    sub_HALFCYCLE_SERIES = [
-                        element
-                        for element in HALFCYCLE_SERIES
-                        if element != comparison_settings.x_axis
-                    ]
-                    comparison_settings.y_axis = st.selectbox(
-                        "Select the series y axis",
-                        sub_HALFCYCLE_SERIES,
-                        index=sub_HALFCYCLE_SERIES.index(comparison_settings.y_axis)
-                        if comparison_settings.y_axis
-                        and comparison_settings.y_axis in sub_HALFCYCLE_SERIES
-                        else 0,
-                        key="y_comparison",
-                    )
-                    logger.debug(f"-> Y axis: {comparison_settings.y_axis}")
-
-                    volume_is_available = True
-                    for series in selected_series:
-                        experiment_id = status.get_index_of(series.experiment_name)
-                        experiment = status[experiment_id]
-                        if experiment.volume is None:
-                            volume_is_available = False
-                            break
-
-                    comparison_settings.scale_by_volume = st.checkbox(
-                        "Scale values by volume",
-                        value=comparison_settings.scale_by_volume
-                        if volume_is_available
-                        else False,
-                        disabled=not volume_is_available,
-                        key="comparison_plot",
-                    )
-                    logger.debug(
-                        f"-> Scale by volume: {comparison_settings.scale_by_volume}"
-                    )
-
-                    area_is_available = True
-                    for series in selected_series:
-                        experiment_id = status.get_index_of(series.experiment_name)
-                        experiment = status[experiment_id]
-                        if experiment.area is None:
-                            area_is_available = False
-                            break
-
-                    comparison_settings.scale_by_area = st.checkbox(
-                        "Scale values by area",
-                        value=comparison_settings.scale_by_area
-                        if area_is_available
-                        else False,
-                        disabled=not area_is_available,
-                        key="by_area_comparison",
-                    )
-                    logger.debug(f"-> Scale by area: {comparison_settings.scale_by_area}")
-
-                    st.markdown("###### Aspect")
-                    comparison_settings.font_size = int(
-                        st.number_input(
-                            "Label font size",
-                            min_value=4,
-                            value=comparison_settings.font_size,
-                            key="font_size_comparison",
+                    with st.expander("Axis options:"):
+                        st.markdown("###### Axis")
+                        comparison_settings.x_axis = st.selectbox(
+                            "Select the series x axis",
+                            HALFCYCLE_SERIES,
+                            key="x_comparison",
+                            index=HALFCYCLE_SERIES.index(comparison_settings.x_axis)
+                            if comparison_settings.x_axis
+                            else 0,
                         )
-                    )
-                    logger.debug(f"-> Font size: {comparison_settings.font_size}")
+                        logger.debug(f"-> X axis: {comparison_settings.x_axis}")
 
-                    comparison_settings.height = int(
-                        st.number_input(
-                            "Plot height",
-                            min_value=10,
-                            value=comparison_settings.height
-                            if comparison_settings.height
-                            else 800,
-                            step=10,
+                        sub_HALFCYCLE_SERIES = [
+                            element
+                            for element in HALFCYCLE_SERIES
+                            if element != comparison_settings.x_axis
+                        ]
+                        comparison_settings.y_axis = st.selectbox(
+                            "Select the series y axis",
+                            sub_HALFCYCLE_SERIES,
+                            index=sub_HALFCYCLE_SERIES.index(comparison_settings.y_axis)
+                            if comparison_settings.y_axis
+                            and comparison_settings.y_axis in sub_HALFCYCLE_SERIES
+                            else 0,
+                            key="y_comparison",
                         )
-                    )
-                    logger.debug(f"-> Plot height: {comparison_settings.height}")
+                        logger.debug(f"-> Y axis: {comparison_settings.y_axis}")
+
+                        volume_is_available = True
+                        for series in selected_series:
+                            experiment_id = status.get_index_of(series.experiment_name)
+                            experiment = status[experiment_id]
+                            if experiment.volume is None:
+                                volume_is_available = False
+                                break
+
+                        comparison_settings.scale_by_volume = st.checkbox(
+                            "Scale values by volume",
+                            value=comparison_settings.scale_by_volume
+                            if volume_is_available
+                            else False,
+                            disabled=not volume_is_available,
+                            key="comparison_plot",
+                        )
+                        logger.debug(
+                            f"-> Scale by volume: {comparison_settings.scale_by_volume}"
+                        )
+
+                        area_is_available = True
+                        for series in selected_series:
+                            experiment_id = status.get_index_of(series.experiment_name)
+                            experiment = status[experiment_id]
+                            if experiment.area is None:
+                                area_is_available = False
+                                break
+
+                        comparison_settings.scale_by_area = st.checkbox(
+                            "Scale values by area",
+                            value=comparison_settings.scale_by_area
+                            if area_is_available
+                            else False,
+                            disabled=not area_is_available,
+                            key="by_area_comparison",
+                        )
+                        logger.debug(
+                            f"-> Scale by area: {comparison_settings.scale_by_area}"
+                        )
+
+                    with st.expander("Plot aspect options:"):
+                        st.markdown("###### Aspect")
+                        comparison_settings.font_size = int(
+                            st.number_input(
+                                "Label/tick font size",
+                                min_value=4,
+                                value=comparison_settings.font_size,
+                                key="font_size_comparison",
+                            )
+                        )
+                        logger.debug(
+                            f"-> Label/tick font size: {comparison_settings.font_size}"
+                        )
+
+                        comparison_settings.axis_font_size = int(
+                            st.number_input(
+                                "Axis title font size",
+                                min_value=4,
+                                value=comparison_settings.axis_font_size,
+                                key="axis_font_size_comparison",
+                            )
+                        )
+                        logger.debug(
+                            f"-> Axis title font size: {comparison_settings.axis_font_size}"
+                        )
+
+                        comparison_settings.reverse = st.checkbox(
+                            "Use reversed experiment-based colorscale",
+                            value=comparison_settings.reverse,
+                        )
+                        logger.debug(
+                            f"-> Reversed colorscale: {comparison_settings.reverse}"
+                        )
+
+                        comparison_settings.height = int(
+                            st.number_input(
+                                "Plot height",
+                                min_value=10,
+                                value=comparison_settings.height
+                                if comparison_settings.height
+                                else 800,
+                                step=10,
+                            )
+                        )
+                        logger.debug(f"-> Plot height: {comparison_settings.height}")
 
                 with col1:
 
@@ -931,6 +1331,17 @@ try:
 
                     # Create a figure with a single plo
                     fig = make_subplots(cols=1, rows=1)
+
+                    # Generate a list of all the currently loaded series associated to a given
+                    # experiment in order to calculate the shadow of color to be used when the
+                    # color_from_base option is selected
+                    experiment_based_selection: Dict[str, List[int]] = {}
+                    for entry in selected_series:
+                        exp_name = entry.experiment_name
+                        if exp_name not in experiment_based_selection:
+                            experiment_based_selection[exp_name] = [entry.cycle_id]
+                        else:
+                            experiment_based_selection[exp_name].append(entry.cycle_id)
 
                     # For each selected series add an independent trace to the plot
                     for entry in selected_series:
@@ -941,10 +1352,21 @@ try:
                         cycle_id = entry.cycle_id
 
                         exp_idx = status.get_index_of(name)
-                        cycle = status[exp_idx].cycles[cycle_id]
+                        experiment = status[exp_idx]
+                        cycle = experiment._cycles[cycle_id]
 
                         label = entry.label
-                        color = entry.hex_color
+
+                        # Compute the shade associated to the cycle of a given experiment
+                        trace_id = experiment_based_selection[name].index(cycle_id)
+                        num_traces = len(experiment_based_selection[name])
+                        shade = RGB_to_HEX(
+                            *experiment.color.get_shade(
+                                trace_id, num_traces, reversed=comparison_settings.reverse
+                            )
+                        )
+                        color = entry.hex_color if entry.color_from_base is False else shade
+
                         volume = (
                             status[exp_idx].volume
                             if comparison_settings.scale_by_volume
@@ -1006,6 +1428,7 @@ try:
                         linecolor="black",
                         gridwidth=1,
                         gridcolor="#DDDDDD",
+                        title_font={"size": comparison_settings.axis_font_size},
                     )
 
                     # Update the settings of the y-axis
@@ -1015,6 +1438,7 @@ try:
                         linecolor="black",
                         gridwidth=1,
                         gridcolor="#DDDDDD",
+                        title_font={"size": comparison_settings.axis_font_size},
                     )
 
                     # Update the settings of plot layout
@@ -1032,42 +1456,43 @@ try:
                     logger.info("Re-Entering plot option section to render export section")
 
                     # Add to the right column the export option
-                    st.markdown("###### Export")
-                    available_formats = ["png", "jpeg", "svg", "pdf"]
-                    comparison_settings.format = st.selectbox(
-                        "Select the format of the file",
-                        available_formats,
-                        index=available_formats.index(comparison_settings.format)
-                        if comparison_settings.format
-                        else 0,
-                        key="format_comparison",
-                    )
-                    logger.debug(f"-> Export format {comparison_settings.format}")
-
-                    comparison_settings.width = int(
-                        st.number_input(
-                            "Plot width",
-                            min_value=10,
-                            value=comparison_settings.width,
+                    with st.expander("Export options"):
+                        st.markdown("###### Export")
+                        available_formats = ["png", "jpeg", "svg", "pdf"]
+                        comparison_settings.format = st.selectbox(
+                            "Select the format of the file",
+                            available_formats,
+                            index=available_formats.index(comparison_settings.format)
+                            if comparison_settings.format
+                            else 0,
+                            key="format_comparison",
                         )
-                    )
-                    logger.debug(f"-> Plot width {comparison_settings.width}")
+                        logger.debug(f"-> Export format {comparison_settings.format}")
 
-                    # Update the settings of plot layout to account for the user define width
-                    fig.update_layout(
-                        plot_bgcolor="#FFFFFF",
-                        height=comparison_settings.height,
-                        width=comparison_settings.width,
-                        font=dict(size=comparison_settings.font_size),
-                    )
+                        comparison_settings.width = int(
+                            st.number_input(
+                                "Plot width",
+                                min_value=10,
+                                value=comparison_settings.width,
+                            )
+                        )
+                        logger.debug(f"-> Plot width {comparison_settings.width}")
 
-                    st.download_button(
-                        "Download plot",
-                        data=fig.to_image(format=comparison_settings.format),
-                        file_name=f"cycle_comparison_plot.{comparison_settings.format}",
-                        on_click=lambda msg: logger.info(msg),
-                        args=[f"DOWNLOAD cycle_plot.{comparison_settings.format}"],
-                    )
+                        # Update the settings of plot layout to account for the user define width
+                        fig.update_layout(
+                            plot_bgcolor="#FFFFFF",
+                            height=comparison_settings.height,
+                            width=comparison_settings.width,
+                            font=dict(size=comparison_settings.font_size),
+                        )
+
+                        st.download_button(
+                            "Download plot",
+                            data=fig.to_image(format=comparison_settings.format),
+                            file_name=f"cycle_comparison_plot.{comparison_settings.format}",
+                            on_click=lambda msg: logger.info(msg),
+                            args=[f"DOWNLOAD cycle_plot.{comparison_settings.format}"],
+                        )
 
     # If there are no experiments in the buffer suggest to the user to load data form the main page
     else:
@@ -1077,7 +1502,10 @@ try:
         accessing this page."""
         )
 
-except st._RerunException:
+    logger.info("FORCING RERUN AT END OF PAGE")
+    force_update_once()
+
+except st.runtime.scriptrunner.script_runner.RerunException:
     logger.info("EXPERIMENTAL RERUN CALLED")
     raise
 

@@ -2,17 +2,40 @@ from io import BytesIO
 from copy import deepcopy
 
 import pickle
+from typing import List
 import streamlit as st
 
+
+def generate_session_state_model(keys: List[str]):
+    buffer = {}
+    for key in keys:
+        if key in st.session_state:
+            buffer[key] = deepcopy(st.session_state[key])
+    return buffer
+
+
 def save_session_state():
+
     bytestream = BytesIO()
 
-    session_state_buffer = deepcopy(dict(st.session_state))
-    del session_state_buffer["Version"]
-    del session_state_buffer["Logger"]
-    del session_state_buffer["Token"]
+    keys = [
+        "Version",
+        "ProgramStatus",
+        "UploadActionRadio",
+        "UploadConfirmation",
+        "SelectedExperimentName",
+        "Page2_CyclePlotSelection",
+        "Page2_ManualSelectorBuffer",
+        "Page2_ComparisonPlot",
+        "Page2_stacked_settings",
+        "Page2_comparison_settings",
+        "ExperimentContainers",
+        "Cellcycling_plots_settings",
+    ]
 
-    pickle.dump(session_state_buffer, bytestream, protocol=pickle.HIGHEST_PROTOCOL)
+    buffer = generate_session_state_model(keys)
+
+    pickle.dump(buffer, bytestream, protocol=pickle.HIGHEST_PROTOCOL)
     bytestream.seek(0)
 
     return bytestream

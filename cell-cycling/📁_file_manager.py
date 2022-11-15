@@ -3,9 +3,11 @@ import pandas as pd
 import os, sys, logging, traceback, pickle, secrets
 
 from core.gui_core import ProgramStatus
+from core.exceptions import MultipleExtensions, UnknownExtension
 from core.colors import ColorRGB, RGB_to_HEX, HEX_to_RGB
 from core.experiment import Experiment, _EXPERIMENT_INIT_COUNTER_
 from core.utils import set_production_page_style
+from core.post_process_handler import update_experiment_name, remove_experiment_entries
 
 # Set the wide layout style and remove menus and markings from display
 st.set_page_config(layout="wide")
@@ -16,33 +18,34 @@ if "Token" not in st.session_state:
     st.session_state["Token"] = secrets.token_hex(4)
 
 @st.cache
-def init_logger():
+def init_logger(dump_log: bool = True):
     logger = logging.getLogger(__name__)
-    handler = logging.FileHandler(f'{st.session_state["Token"]}.log', mode="w")
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s [line: %(lineno)d]")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    if dump_log:
+        handler = logging.FileHandler(f'{st.session_state["Token"]}.log', mode="w")
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s [line: %(lineno)d]")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
     return logger
 
 logger = init_logger()
 
+# Configure the session state for the first time with the data useful to completly describe
+# The current page
+if "ProgramStatus" not in st.session_state:
+    st.session_state["Version"] = "0.1.1"
+    st.session_state["Logger"] = logger
+    st.session_state["ProgramStatus"] = ProgramStatus()
+    st.session_state["UploadActionRadio"] = None
+    st.session_state["UploadConfirmation"] = [None, None]
+    st.session_state["SelectedExperimentName"] = None
+
+# Create a short name for the ProgramStatus object in the session_state chache
+status: ProgramStatus = st.session_state["ProgramStatus"]
+
 try:
 
     logger.info("RUNNING File manager page rendering")
-
-    # Configure the session state for the first time with the data useful to completly describe
-    # The current page
-    if "ProgramStatus" not in st.session_state:
-        st.session_state["Version"] = "0.1.0"
-        st.session_state["Logger"] = logger
-        st.session_state["ProgramStatus"] = ProgramStatus()
-        st.session_state["UploadActionRadio"] = None
-        st.session_state["UploadConfirmation"] = [None, None]
-        st.session_state["SelectedExperimentName"] = None
-
-    # Create a short name for the ProgramStatus object in the session_state chache
-    status: ProgramStatus = st.session_state["ProgramStatus"]
 
     with st.sidebar:
         st.info(f'Session token: {st.session_state["Token"]}')
@@ -113,61 +116,75 @@ try:
                 with st.spinner(text="Wait while the files are uploaded"):
 
                     # Define a new experiment object
-                    new_experiment = Experiment(files)
-
-                    # Set the name selected by the user if existing
-                    if name != "":
-                        new_experiment.name = name
+                    try:
+                        new_experiment = Experiment(files)
+                    
+                    except MultipleExtensions:
+                        st.error("ERROR: Cannot operate on different file types.")
+                    
+                    except UnknownExtension:
+                        st.error("ERROR: Unknown file extension detected.")
+                    
                     else:
-                        name = new_experiment.name
+                        # Set the name selected by the user if existing
+                        if name != "":
+                            new_experiment.name = name
+                        else:
+                            name = new_experiment.name
 
-                    # If the selected action is "Create new experiment" add the new experiment to the ProgramStatus
-                    if action == "Create new experiment":
-                        status.append_experiment(new_experiment)
-                        logger.info(f"CREATED experiment {name}")
+                        # If the selected action is "Create new experiment" add the new experiment to the ProgramStatus
+                        if action == "Create new experiment":
+                            status.append_experiment(new_experiment)
+                            logger.info(f"CREATED experiment {name}")
 
-                    # If the selected action is "Add new experiment", add the object to the already available one
-                    else:
-                        status[status.get_index_of(name)] += new_experiment
-                        logger.info(f"UPDATED experiment {name}")
+                        # If the selected action is "Add new experiment", add the object to the already available one
+                        else:
+                            experiment = status[status.get_index_of(name)]
 
-                    # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
-                    st.session_state["UploadConfirmation"][0] = new_experiment.name
+                            if experiment.manager.instrument != new_experiment.manager.instrument:
+                                st.error("ERROR: Cannot join file from different instruments in a single experiment")
+                                logger.error(f"ERROR: Cannot join file from different instruments in a single experiment {name}")
+                            else:
+                                experiment += new_experiment
+                                logger.info(f"UPDATED experiment {name}")
 
-                    # Generate a list of skipped files
-                    skipped_files = []
-                    if new_experiment.manager.instrument == "GAMRY":
-                        if len(new_experiment.manager.bytestreams) != len(
-                            new_experiment.manager.halfcycles
-                        ):
+                        # Add the informations about the loaded experiment to a rerun-safe self-cleaning variable
+                        st.session_state["UploadConfirmation"][0] = new_experiment.name
+
+                        # Generate a list of skipped files
+                        skipped_files = []
+                        if new_experiment.manager.instrument == "GAMRY":
+                            if len(new_experiment.manager.bytestreams) != len(
+                                new_experiment.manager.halfcycles
+                            ):
+                                for filename in new_experiment.manager.bytestreams.keys():
+                                    if filename not in new_experiment.manager.halfcycles.keys():
+                                        skipped_files.append(filename)
+                                st.session_state["UploadConfirmation"][1] = skipped_files
+
+                        elif new_experiment.manager.instrument == "BIOLOGIC":
                             for filename in new_experiment.manager.bytestreams.keys():
-                                if filename not in new_experiment.manager.halfcycles.keys():
+                                find = False
+                                for search in new_experiment.manager.halfcycles.keys():
+                                    if filename in search:
+                                        find = True
+                                        break
+
+                                if find is False:
                                     skipped_files.append(filename)
-                            st.session_state["UploadConfirmation"][1] = skipped_files
+                            if skipped_files != []:
+                                st.session_state["UploadConfirmation"][1] = skipped_files
 
-                    elif new_experiment.manager.instrument == "BIOLOGIC":
-                        for filename in new_experiment.manager.bytestreams.keys():
-                            find = False
-                            for search in new_experiment.manager.halfcycles.keys():
-                                if filename in search:
-                                    find = True
-                                    break
+                        else:
+                            raise RuntimeError
 
-                            if find is False:
-                                skipped_files.append(filename)
                         if skipped_files != []:
-                            st.session_state["UploadConfirmation"][1] = skipped_files
+                            status[status.get_index_of(name)]._skipped_files += len(
+                                skipped_files
+                            )
 
-                    else:
-                        raise RuntimeError
-
-                    if skipped_files != []:
-                        status[status.get_index_of(name)]._skipped_files += len(
-                            skipped_files
-                        )
-
-                    # Rerun the page to force update
-                    st.experimental_rerun()
+                        # Rerun the page to force update
+                        st.experimental_rerun()
 
         created_experiment = st.session_state["UploadConfirmation"][0]
         skipped_files = st.session_state["UploadConfirmation"][1]
@@ -243,6 +260,7 @@ try:
 
                 if delete:
                     logger.info(f"DELETED experiment {experiment.name}")
+                    remove_experiment_entries(experiment.name)
                     status.remove_experiment(status.get_index_of(experiment.name))
                     if st.session_state["SelectedExperimentName"] == experiment.name:
                         st.session_state["SelectedExperimentName"] = None
@@ -264,6 +282,7 @@ try:
                     )
                     experiment.name = new_experiment_name
                     st.session_state["SelectedExperimentName"] = new_experiment_name
+                    update_experiment_name(name, new_experiment_name)
                     st.experimental_rerun()
 
                 # Allow the user to define the experiment volume
@@ -594,7 +613,7 @@ try:
             st.markdown("Instrument: ***{}***".format(experiment.manager.instrument))
 
             # Get the cycle list from the current experiment and compute the number of hidden cycles
-            cycles = experiment.cycles
+            cycles = experiment._cycles
             n_hidden = 0
             for cycle in cycles:
                 if cycle._hidden:
@@ -709,7 +728,7 @@ try:
                 st.markdown("**Cycles report:**")
                 st.table(df)
 
-except st._RerunException:
+except st.runtime.scriptrunner.script_runner.RerunException:
     logger.info("EXPERIMENTAL RERUN CALLED")
     raise
 
