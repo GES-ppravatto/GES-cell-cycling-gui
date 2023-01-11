@@ -99,7 +99,7 @@ def get_data_series(
         if area is None:
             return "Power (W)", average_powers
         else:
-            average_powers = [1000*power / area for power in average_powers]
+            average_powers = [1000 * power / area for power in average_powers]
             return (
                 "Power density (mW/cm<sup>2</sup>)",
                 average_powers,
@@ -680,13 +680,15 @@ def cell_cycling_plotter_widget(
         ):
             plot_settings.limits["x"] = xrange
             plot_settings.limits["y"] = (
-                yrange if yrange is not None else plot_settings.limits["y"]
+                [0., yrange[1]] if yrange is not None else plot_settings.limits["y"]
             )
             plot_settings.limits["y2"] = (
-                y2range if y2range is not None else plot_settings.limits["y2"]
+                [0., y2range[1]] if y2range is not None else plot_settings.limits["y2"]
             )
             plot_settings.limits["y_annotation_reference"] = (
-                yrange if yrange is not None else y2range
+                plot_settings.limits["y"]
+                if plot_settings.limits["y"] is not None
+                else plot_settings.limits["y2"]
             )
 
             logger.debug(
@@ -992,9 +994,8 @@ try:
                                         "Select cycle index",
                                         value=current_reference[1],
                                         min_value=0,
-                                        max_value=len(
-                                            selected_container[exp_index]._cycles
-                                        )-1,
+                                        max_value=len(selected_container[exp_index]._cycles)
+                                        - 1,
                                         step=1,
                                         disabled=True
                                         if len(selected_container) == 0
@@ -1069,7 +1070,9 @@ try:
                                     )
 
                                     for name in get_experiment_names:
-                                        exp_index = selected_container.get_index_from_name(name)
+                                        exp_index = selected_container.get_index_from_name(
+                                            name
+                                        )
 
                                         if selected_container.reference[0] == exp_index:
                                             selected_container.reference = [0, 0]
