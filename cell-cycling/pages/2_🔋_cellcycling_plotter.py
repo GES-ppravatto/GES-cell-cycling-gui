@@ -337,6 +337,8 @@ def cell_cycling_plotter_widget(
                 value=plot_settings.scale_by_volume if volume_is_available else False,
                 disabled=not volume_is_available,
                 key=f"volume_{unique_id}",
+                on_change=clear_y_plot_limit,
+                args=[plot_settings.limits],
             )
             logger.debug(f"-> Scale by volume: {plot_settings.scale_by_volume}")
 
@@ -354,6 +356,8 @@ def cell_cycling_plotter_widget(
                 value=plot_settings.scale_by_area if area_is_available else False,
                 disabled=not area_is_available,
                 key=f"area_{unique_id}",
+                on_change=clear_y_plot_limit,
+                args=[plot_settings.limits],
             )
             logger.debug(f"-> Scale by area: {plot_settings.scale_by_area}")
 
