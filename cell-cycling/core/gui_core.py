@@ -391,8 +391,8 @@ class StackedPlotSettings:
     show_charge: bool = True
     show_discharge: bool = True
     reverse: bool = False
-    font_size: int = 14
-    axis_font_size: int = 18
+    font_size: int = 24
+    axis_font_size: int = 32
     plot_height: int = 500
     format: str = None
     total_width: int = None
@@ -407,8 +407,8 @@ class ComparisonPlotSettings:
     scale_by_area: bool = False
     show_charge: bool = True
     show_discharge: bool = True
-    font_size: int = 14
-    axis_font_size: int = 18
+    font_size: int = 24
+    axis_font_size: int = 32
     reverse: bool = False
     height: int = 600
     format: str = None
@@ -418,7 +418,7 @@ class ComparisonPlotSettings:
 @dataclass
 class CellcyclingPlotSettings:
 
-    annotation_size: int = 14
+    annotation_size: int = 20
     annotation_color: str = "#000000"
     primary_axis_name: str = None
     secondary_axis_name: str = None
@@ -430,8 +430,8 @@ class CellcyclingPlotSettings:
     marker_size: str = 8
     marker_with_border: str = False
     which_grid: str = None
-    font_size: str = 14
-    axis_font_size: int = 18
+    font_size: str = 24
+    axis_font_size: int = 32
     height: str = 600
     format: str = None
     width: str = 1200
