@@ -701,7 +701,7 @@ try:
                             font=dict(size=stacked_settings.font_size),
                         )
 
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, theme=None)
 
                 with col2:
 
@@ -1449,7 +1449,7 @@ try:
                         font=dict(size=comparison_settings.font_size),
                     )
 
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, theme=None)
 
                 with col2:
 
