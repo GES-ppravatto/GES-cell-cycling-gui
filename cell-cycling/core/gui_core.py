@@ -197,10 +197,10 @@ class ExperimentSelector:
 
         # Get the index of the experiment in the status memory
         id = status.get_index_of(name)
-
+        id_ordering = status[id].ordering
         # If cycles is None include all the available cycles in the experiment
         if cycles is None:
-            cycle_list = status[id].manager.get_cycles()
+            cycle_list = status[id].manager.get_cycles(id_ordering)
             stride = int(math.ceil(len(cycle_list) / 10))
             cycles = [
                 cycle.number for idx, cycle in enumerate(cycle_list) if idx % stride == 0
@@ -209,8 +209,9 @@ class ExperimentSelector:
         # Else, check that all the given cycle index ar valid
         else:
             for number in cycles:
-                if number < 0 or number >= len(status[id].manager.get_cycles()):
-                    raise ValueError
+                number_of_cycles = len(status[id].manager.get_cycles(id_ordering))
+                if number < 0 or number >= number_of_cycles:
+                    raise ValueError(f"Cycle index {number} must be non negative and smaller than {number_of_cycles}")
 
         # If labels are provided check that the list length match and apply the given labels
         if labels is not None:
