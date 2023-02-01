@@ -75,11 +75,10 @@ def get_halfcycle_series(
             return "Current (A)", current
         else:
             return "Current density (A/cm<sup>2</sup>)", current / area
-        
 
     elif title == "charge":
         charge = halfcycle.Q
-        if volume is None :
+        if volume is None:
             return "Capacity (mAh)", charge
         else:
             return "Volumetric capacity (Ah/L)", charge / (1000 * volume)
@@ -89,7 +88,7 @@ def get_halfcycle_series(
         if area is None:
             return "Power (W)", power
         else:
-            return "Power density (mW/cm<sup>2</sup>)", 1000*power / area
+            return "Power density (mW/cm<sup>2</sup>)", 1000 * power / area
 
     elif title == "energy":
         energy = halfcycle.energy
@@ -362,7 +361,7 @@ try:
                                 [obj.number for obj in cycles],
                                 default=manual_selection_buffer,
                             )
-                            buffer_selection.sort()     # Sort the traces automatically
+                            buffer_selection.sort()  # Sort the traces automatically
                             st.session_state[
                                 "Page2_ManualSelectorBuffer"
                             ] = buffer_selection
@@ -630,6 +629,7 @@ try:
                                         y=y_series,
                                         line=dict(color=shade),
                                         name=series_name,
+                                        mode="lines",
                                     ),
                                     row=index + 1,
                                     col=1,
@@ -657,6 +657,7 @@ try:
                                         line=dict(color=shade),
                                         name=series_name,
                                         showlegend=False if cycle.charge else True,
+                                        mode="lines",
                                     ),
                                     row=index + 1,
                                     col=1,
@@ -673,7 +674,7 @@ try:
                             gridcolor="#DDDDDD",
                             title_font={"size": stacked_settings.axis_font_size},
                             range=stacked_settings.x_range,
-                            dtick = stacked_settings.x_dtick,
+                            dtick=stacked_settings.x_dtick,
                         )
 
                         if stacked_settings.shared_x:
@@ -689,7 +690,7 @@ try:
                             gridcolor="#DDDDDD",
                             title_font={"size": stacked_settings.axis_font_size},
                             range=stacked_settings.y_range,
-                            dtick = stacked_settings.y_dtick,
+                            dtick=stacked_settings.y_dtick,
                         )
 
                         # Update the settings of plot layout
@@ -724,7 +725,7 @@ try:
                             logger.info(f"X Autorange: {stacked_settings.x_autorange}")
                             st.experimental_rerun()
 
-                        # If autorange is set to false and no range is available get the 
+                        # If autorange is set to false and no range is available get the
                         # starting values for the range according to the automatic ones
                         if (
                             stacked_settings.x_autorange is False
@@ -739,7 +740,7 @@ try:
                                 xmax = xrange[1] if xmax is None else max(xmax, xrange[1])
                             stacked_settings.x_range = [float(xmin), float(xmax)]
                             logger.info(f"SET x range: {stacked_settings.x_range}")
-                        
+
                         # If the autorange is false get the user input about the desired range
                         # and save it in the sesison state
                         if stacked_settings.x_autorange is False:
@@ -757,7 +758,7 @@ try:
                         # If the autorange is false deactivate custom ticks
                         else:
                             stacked_settings.custom_x_dticks = False
-                        
+
                         # Show a checkbox to enable custom axis tick
                         stacked_settings.custom_x_dticks = st.checkbox(
                             "Use custom X ticks intervals",
@@ -770,14 +771,16 @@ try:
 
                         # If the custom tick option is enable get user input
                         if stacked_settings.custom_x_dticks:
-                            
+
                             # If no default value is set, compute one based on the range
                             if stacked_settings.x_dtick is None:
                                 x_range = stacked_settings.x_range
                                 stacked_settings.x_dtick = float(
                                     (x_range[1] - x_range[0]) / 10.0
                                 )
-                                logger.debug(f"-> Setting X dtick default: {stacked_settings.x_dtick}")
+                                logger.debug(
+                                    f"-> Setting X dtick default: {stacked_settings.x_dtick}"
+                                )
 
                             # Get user input
                             stacked_settings.x_dtick = float(
@@ -807,7 +810,7 @@ try:
                             logger.info(f"Y Autorange: {stacked_settings.y_autorange}")
                             st.experimental_rerun()
 
-                        # If autorange is set to false and no range is available get the 
+                        # If autorange is set to false and no range is available get the
                         # starting values for the range according to the automatic ones
                         if (
                             stacked_settings.y_autorange is False
@@ -823,7 +826,7 @@ try:
                                 ymin = yrange[0] if ymin is None else min(ymin, yrange[0])
                                 ymax = yrange[1] if ymax is None else max(ymax, yrange[1])
                             stacked_settings.y_range = [float(ymin), float(ymax)]
-                        
+
                         # If the autorange is false get the user input about the desired range
                         # and save it in the sesison state
                         if stacked_settings.y_autorange is False:
@@ -854,14 +857,14 @@ try:
 
                         # If the custom tick option is enable get user input
                         if stacked_settings.custom_y_dticks:
-                            
+
                             # If no default value is set, compute one based on the range
                             if stacked_settings.y_dtick is None:
                                 y_range = stacked_settings.y_range
                                 stacked_settings.y_dtick = float(
                                     (y_range[1] - y_range[0]) / 5
                                 )
-                            
+
                             # Get user input
                             stacked_settings.y_dtick = float(
                                 st.number_input(
@@ -872,7 +875,7 @@ try:
                             )
                             logger.info(f"SET Y dtick: {stacked_settings.x_dtick}")
 
-                         # If custom y dtick option is false celar the selected dtick value
+                        # If custom y dtick option is false celar the selected dtick value
                         elif stacked_settings.y_dtick is not None:
                             stacked_settings.y_dtick = None
 
@@ -1394,6 +1397,7 @@ try:
                                     y=y_series,
                                     line=dict(color=color),
                                     name=label,
+                                    mode="lines",
                                 ),
                                 row=1,
                                 col=1,
@@ -1416,6 +1420,7 @@ try:
                                     line=dict(color=color),
                                     name=label,
                                     showlegend=False if cycle.charge else True,
+                                    mode="lines",
                                 ),
                                 row=1,
                                 col=1,
