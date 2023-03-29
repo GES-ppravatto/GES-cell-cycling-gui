@@ -19,7 +19,8 @@ set_production_page_style()
 if "Logger" in st.session_state:
     logger: logging.Logger = st.session_state["Logger"]
 else:
-    raise RuntimeError
+    st.error("**ERROR:** Please return to the file manager page to initialize session")
+    raise RuntimeError("Logger not found in session state")
 
 
 # Define a dictionary of available markers with their plotly name
