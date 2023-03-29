@@ -11,8 +11,8 @@ from echemsuite.cellcycling.read_input import FileManager, Instrument
 from echemsuite.cellcycling.cycles import Cycle, CellCycling
 
 
-# Counter of the number of calls to the Experiment.__init__ function
-_EXPERIMENT_INIT_COUNTER_: int = 0
+if "__EXPERIMENT_INIT_COUNTER__" not in st.session_state:
+        st.session_state["__EXPERIMENT_INIT_COUNTER__"] = 0
 
 
 class Experiment:
@@ -96,9 +96,8 @@ class Experiment:
         self._update_cycles_based_objects()
 
         # Get univocal ID based on the number of object constructed
-        global _EXPERIMENT_INIT_COUNTER_
-        self._id = _EXPERIMENT_INIT_COUNTER_
-        _EXPERIMENT_INIT_COUNTER_ += 1
+        self._id = st.session_state["__EXPERIMENT_INIT_COUNTER__"]
+        st.session_state["__EXPERIMENT_INIT_COUNTER__"] += 1
 
         # Set the name of the experiment by default
         self._name = f"experiment_{self._id}"

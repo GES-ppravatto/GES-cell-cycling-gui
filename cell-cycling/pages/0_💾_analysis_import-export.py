@@ -9,7 +9,8 @@ from core.session_state_manager import save_session_state, load_session_state
 if "Logger" in st.session_state:
     logger: logging.Logger = st.session_state["Logger"]
 else:
-    raise RuntimeError
+    st.error("**ERROR:** Please return to the file manager page to initialize session")
+    raise RuntimeError("Logger not found in session state")
 
 
 def print_log_entry(name, save: bool = True):

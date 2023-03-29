@@ -5,7 +5,8 @@ import os, sys, logging, traceback, pickle, secrets
 from core.gui_core import ProgramStatus
 from core.exceptions import MultipleExtensions, UnknownExtension
 from core.colors import ColorRGB, RGB_to_HEX, HEX_to_RGB
-from core.experiment import Experiment, _EXPERIMENT_INIT_COUNTER_
+
+from core.experiment import Experiment
 from core.utils import set_production_page_style
 from core.post_process_handler import update_experiment_name, remove_experiment_entries
 
@@ -39,6 +40,9 @@ if "ProgramStatus" not in st.session_state:
     st.session_state["UploadActionRadio"] = None
     st.session_state["UploadConfirmation"] = [None, None]
     st.session_state["SelectedExperimentName"] = None
+
+    if "__EXPERIMENT_INIT_COUNTER__" not in st.session_state:
+        st.session_state["__EXPERIMENT_INIT_COUNTER__"] = 0
 
 # Create a short name for the ProgramStatus object in the session_state chache
 status: ProgramStatus = st.session_state["ProgramStatus"]
@@ -80,8 +84,9 @@ try:
 
             # If "Create new experiment" is selected ask the user to input the experiment name
             if action == "Create new experiment":
+                _exp_init_counter_ = st.session_state["__EXPERIMENT_INIT_COUNTER__"]
                 name = st.text_input(
-                    f"Select a name for the experiment (default: experiment_{_EXPERIMENT_INIT_COUNTER_})",
+                    f"Select a name for the experiment (default: experiment_{_exp_init_counter_})",
                     "",  # Default "" value will trigger the class default naming experiment_{N}
                 )
                 logger.debug(f"-> Name textbox value: '{name}'")
