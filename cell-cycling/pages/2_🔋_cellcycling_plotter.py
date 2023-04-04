@@ -974,41 +974,47 @@ try:
                                 logger.info(
                                     "Render section to add change reference cycle of the container"
                                 )
-                                st.markdown("###### Change container reference")
 
-                                current_reference = selected_container.reference
-                                exp_index = int(
-                                    st.number_input(
-                                        "Select experiment index",
-                                        value=current_reference[0],
-                                        min_value=0,
-                                        max_value=len(selected_container) - 1,
-                                        step=1,
-                                        disabled=True
-                                        if len(selected_container) == 0
-                                        else False,
+                                if len(selected_container) != 0:
+
+                                    st.markdown("###### Change container reference")
+
+                                    current_reference = selected_container.reference
+                                    exp_index = int(
+                                        st.number_input(
+                                            "Select experiment index",
+                                            value=current_reference[0],
+                                            min_value=0,
+                                            max_value=len(selected_container) - 1,
+                                            step=1,
+                                            disabled=True
+                                            if len(selected_container) == 0
+                                            else False,
+                                        )
                                     )
-                                )
 
-                                cycle_index = int(
-                                    st.number_input(
-                                        "Select cycle index",
-                                        value=current_reference[1],
-                                        min_value=0,
-                                        max_value=len(selected_container[exp_index]._cycles)
-                                        - 1,
-                                        step=1,
-                                        disabled=True
-                                        if len(selected_container) == 0
-                                        else False,
+                                    cycle_index = int(
+                                        st.number_input(
+                                            "Select cycle index",
+                                            value=current_reference[1],
+                                            min_value=0,
+                                            max_value=len(selected_container[exp_index]._cycles)
+                                            - 1,
+                                            step=1,
+                                            disabled=True
+                                            if len(selected_container) == 0
+                                            else False,
+                                        )
                                     )
-                                )
 
-                                apply_ref = st.button("🗒️ Apply new reference")
+                                    apply_ref = st.button("🗒️ Apply new reference")
 
-                                if apply_ref:
-                                    selected_container.reference = [exp_index, cycle_index]
-                                    st.experimental_rerun()
+                                    if apply_ref:
+                                        selected_container.reference = [exp_index, cycle_index]
+                                        st.experimental_rerun()
+                                
+                                else:
+                                    st.info("**INFO:** Cannot change reference in an empty conatiner. Please add experiments using the `Add experiment` page.")
 
                                 # selected_container.
 
