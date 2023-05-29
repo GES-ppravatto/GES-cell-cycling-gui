@@ -89,9 +89,7 @@ def get_data_series(
         if volume is None:
             return "Capacity (mAh)", total_capacities
         else:
-            normalized_energies = [
-                capacity / (1000 * volume) for capacity in total_capacities
-            ]
+            normalized_energies = [capacity / (1000 * volume) for capacity in total_capacities]
             return "Volumetric capacity (Ah/L)", normalized_energies
 
     elif option == "Average power - Discharge":
@@ -117,14 +115,10 @@ if "ExperimentContainers" not in st.session_state:
 
 # Fetch fresh reference to the variables in session state
 available_containers: List[ExperimentContainer] = st.session_state["ExperimentContainers"]
-plot_settings_dict: Dict[str, CellcyclingPlotSettings] = st.session_state[
-    "Cellcycling_plots_settings"
-]
+plot_settings_dict: Dict[str, CellcyclingPlotSettings] = st.session_state["Cellcycling_plots_settings"]
 
 
-def clear_y_plot_limit(
-    plot_limits: Dict[str, List[Union[None, float]]], which: str = "both"
-) -> None:
+def clear_y_plot_limit(plot_limits: Dict[str, List[Union[None, float]]], which: str = "both") -> None:
     if which == "y":
         plot_limits["y"] = [None, None]
     elif which == "y2":
@@ -136,9 +130,7 @@ def clear_y_plot_limit(
         raise RuntimeError
 
 
-def cell_cycling_plotter_widget(
-    plot_settings: CellcyclingPlotSettings, unique_id: str
-) -> None:
+def cell_cycling_plotter_widget(plot_settings: CellcyclingPlotSettings, unique_id: str) -> None:
 
     # Define an annotation editor if there is a plot to which the annotations can be
     # added (plot_limits will be initialized on plot change and a rerun will be triggered)
@@ -187,9 +179,7 @@ def cell_cycling_plotter_widget(
 
             with col2:
                 if mode == "Add new":
-                    annotation = st.text_input(
-                        "Enter the annotation content", key=f"annotation_text_{unique_id}"
-                    )
+                    annotation = st.text_input("Enter the annotation content", key=f"annotation_text_{unique_id}")
                 else:
                     annotation = st.selectbox(
                         "Select annotation",
@@ -203,9 +193,7 @@ def cell_cycling_plotter_widget(
                     "X position",
                     min_value=float(plot_settings.limits["x"][0]),
                     max_value=float(plot_settings.limits["x"][1]),
-                    value=plot_settings.annotations[annotation][0]
-                    if annotation in plot_settings.annotations
-                    else None,
+                    value=plot_settings.annotations[annotation][0] if annotation in plot_settings.annotations else None,
                     step=0.1,
                     key=f"annotation_x_{unique_id}",
                 )
@@ -216,9 +204,7 @@ def cell_cycling_plotter_widget(
                     "Y position",
                     min_value=float(plot_settings.limits["y_annotation_reference"][0]),
                     max_value=float(plot_settings.limits["y_annotation_reference"][1]),
-                    value=plot_settings.annotations[annotation][1]
-                    if annotation in plot_settings.annotations
-                    else None,
+                    value=plot_settings.annotations[annotation][1] if annotation in plot_settings.annotations else None,
                     step=0.1,
                     key=f"annotation_y_{unique_id}",
                 )
@@ -252,9 +238,7 @@ def cell_cycling_plotter_widget(
 
             if apply or mode == "Edit existing":
                 if annotation is not None and annotation != "":
-                    logger.info(
-                        f"SET annotation '{annotation}' to x: {x_position}, y: {y_position}"
-                    )
+                    logger.info(f"SET annotation '{annotation}' to x: {x_position}, y: {y_position}")
                     plot_settings.annotations[annotation] = [x_position, y_position]
 
     # Initialize a set of columns on top of the plot section to hold buttons
@@ -286,9 +270,7 @@ def cell_cycling_plotter_widget(
             plot_settings.primary_axis_name = st.selectbox(
                 "Select the dataset for the primary Y axis",
                 Y_OPTIONS,
-                index=Y_OPTIONS.index(plot_settings.primary_axis_name)
-                if plot_settings.primary_axis_name
-                else 0,
+                index=Y_OPTIONS.index(plot_settings.primary_axis_name) if plot_settings.primary_axis_name else 0,
                 on_change=clear_y_plot_limit,
                 args=[plot_settings.limits],
                 key=f"primary_y_name_{unique_id}"
@@ -296,15 +278,12 @@ def cell_cycling_plotter_widget(
             )
             logger.debug(f"-> Primary Y series: {plot_settings.primary_axis_name}")
 
-            sub_Y_OPTIONS = [
-                opt for opt in Y_OPTIONS if opt != plot_settings.primary_axis_name
-            ]
+            sub_Y_OPTIONS = [opt for opt in Y_OPTIONS if opt != plot_settings.primary_axis_name]
             plot_settings.secondary_axis_name = st.selectbox(
                 "Select the dataset for the secondary Y axis",
                 sub_Y_OPTIONS,
                 index=sub_Y_OPTIONS.index(plot_settings.secondary_axis_name)
-                if plot_settings.secondary_axis_name
-                and plot_settings.secondary_axis_name in sub_Y_OPTIONS
+                if plot_settings.secondary_axis_name and plot_settings.secondary_axis_name in sub_Y_OPTIONS
                 else 0,
                 on_change=clear_y_plot_limit,
                 args=[plot_settings.limits],
@@ -317,9 +296,7 @@ def cell_cycling_plotter_widget(
             plot_settings.y_axis_mode = st.radio(
                 "Select which Y axis series to show",
                 Y_MODES,
-                index=Y_MODES.index(plot_settings.y_axis_mode)
-                if plot_settings.y_axis_mode
-                else 0,
+                index=Y_MODES.index(plot_settings.y_axis_mode) if plot_settings.y_axis_mode else 0,
                 key=f"y_mode_{unique_id}",
             )
             logger.debug(f"-> Y axis mode: {plot_settings.y_axis_mode}")
@@ -376,15 +353,12 @@ def cell_cycling_plotter_widget(
             )
             logger.debug(f"-> Primary axis marker: {plot_settings.primary_axis_marker}")
 
-            available_MARKERS = [
-                m for m in MARKERS.keys() if m != plot_settings.primary_axis_marker
-            ]
+            available_MARKERS = [m for m in MARKERS.keys() if m != plot_settings.primary_axis_marker]
             plot_settings.secondary_axis_marker = st.selectbox(
                 "Select secondary Y axis markers",
                 available_MARKERS,
                 index=available_MARKERS.index(plot_settings.secondary_axis_marker)
-                if plot_settings.secondary_axis_marker
-                and plot_settings.secondary_axis_marker in available_MARKERS
+                if plot_settings.secondary_axis_marker and plot_settings.secondary_axis_marker in available_MARKERS
                 else 0,
                 key=f"secondary_marker_{unique_id}",
             )
@@ -509,9 +483,7 @@ def cell_cycling_plotter_widget(
                             marker_symbol=primary_marker,
                             marker=dict(
                                 size=plot_settings.marker_size,
-                                line=dict(width=1, color="DarkSlateGrey")
-                                if plot_settings.marker_with_border
-                                else None,
+                                line=dict(width=1, color="DarkSlateGrey") if plot_settings.marker_with_border else None,
                             ),
                             line=dict(color=container.hex_color),
                             showlegend=True if cycling_index == 0 else False,
@@ -529,14 +501,11 @@ def cell_cycling_plotter_widget(
                             marker_symbol=secondary_marker,
                             marker=dict(
                                 size=plot_settings.marker_size,
-                                line=dict(width=1, color="DarkSlateGrey")
-                                if plot_settings.marker_with_border
-                                else None,
+                                line=dict(width=1, color="DarkSlateGrey") if plot_settings.marker_with_border else None,
                             ),
                             line=dict(color=container.hex_color),
                             showlegend=True
-                            if plot_settings.y_axis_mode == "Only secondary"
-                            and cycling_index == 0
+                            if plot_settings.y_axis_mode == "Only secondary" and cycling_index == 0
                             else False,
                         ),
                         secondary_y=True,
@@ -622,9 +591,7 @@ def cell_cycling_plotter_widget(
         with chide:
             hide = st.button(
                 "🚫 Hide cycles",
-                disabled=False
-                if selected_points != [] and selected_points is not None
-                else True,
+                disabled=False if selected_points != [] and selected_points is not None else True,
                 key=f"hide_{unique_id}",
             )
 
@@ -634,9 +601,7 @@ def cell_cycling_plotter_widget(
 
                 for selected_point in selected_points:
                     container_name = trace_list[selected_point["curveNumber"]]
-                    container_idx = [obj.name for obj in available_containers].index(
-                        container_name
-                    )
+                    container_idx = [obj.name for obj in available_containers].index(container_name)
                     available_containers[container_idx].hide_cycle(selected_point["x"])
 
                 st.experimental_rerun()
@@ -649,47 +614,23 @@ def cell_cycling_plotter_widget(
                 st.experimental_rerun()
 
         # Evaluate the current plot limits
-        xrange = (
-            None
-            if figure_data.layout.xaxis.range is None
-            else [float(x) for x in figure_data.layout.xaxis.range]
-        )
-        yrange = (
-            None
-            if figure_data.layout.yaxis.range is None
-            else [float(y) for y in figure_data.layout.yaxis.range]
-        )
+        xrange = None if figure_data.layout.xaxis.range is None else [float(x) for x in figure_data.layout.xaxis.range]
+        yrange = None if figure_data.layout.yaxis.range is None else [float(y) for y in figure_data.layout.yaxis.range]
 
-        y2range = (
-            [float(y) for y in figure_data.layout.yaxis2.range]
-            if hasattr(figure_data.layout, "yaxis2")
-            else None
-        )
+        y2range = [float(y) for y in figure_data.layout.yaxis2.range] if hasattr(figure_data.layout, "yaxis2") else None
 
         # Update the axis ranges if a change is detected. Exclude the axis not currently
         # plotted to avoid continuous rerun of the page
         if (
             plot_settings.limits["x"] != xrange
-            or (
-                plot_settings.limits["y"] != yrange
-                and plot_settings.y_axis_mode != "Only secondary"
-            )
-            or (
-                plot_settings.limits["y2"] != y2range
-                and plot_settings.y_axis_mode != "Only primary"
-            )
+            or (plot_settings.limits["y"] != yrange and plot_settings.y_axis_mode != "Only secondary")
+            or (plot_settings.limits["y2"] != y2range and plot_settings.y_axis_mode != "Only primary")
         ):
             plot_settings.limits["x"] = xrange
-            plot_settings.limits["y"] = (
-                [0., yrange[1]] if yrange is not None else plot_settings.limits["y"]
-            )
-            plot_settings.limits["y2"] = (
-                [0., y2range[1]] if y2range is not None else plot_settings.limits["y2"]
-            )
+            plot_settings.limits["y"] = [0.0, yrange[1]] if yrange is not None else plot_settings.limits["y"]
+            plot_settings.limits["y2"] = [0.0, y2range[1]] if y2range is not None else plot_settings.limits["y2"]
             plot_settings.limits["y_annotation_reference"] = (
-                plot_settings.limits["y"]
-                if plot_settings.limits["y"] is not None
-                else plot_settings.limits["y2"]
+                plot_settings.limits["y"] if plot_settings.limits["y"] is not None else plot_settings.limits["y2"]
             )
 
             logger.debug(
@@ -728,10 +669,7 @@ def cell_cycling_plotter_widget(
                 )
                 logger.debug(f"-> Min Y1: {y1_min}")
 
-                if (
-                    plot_settings.limits["y"][0] != y1_min
-                    or plot_settings.limits["y"][1] != y1_max
-                ):
+                if plot_settings.limits["y"][0] != y1_min or plot_settings.limits["y"][1] != y1_max:
                     plot_settings.limits["y"] = [y1_min, y1_max]
                     logger.info(f"Setting Y limits to {plot_settings.limits['y']}")
                     st.experimental_rerun()
@@ -759,10 +697,7 @@ def cell_cycling_plotter_widget(
                 )
                 logger.debug(f"-> Min Y2: {y2_min}")
 
-                if (
-                    plot_settings.limits["y2"][0] != y2_min
-                    or plot_settings.limits["y2"][1] != y2_max
-                ):
+                if plot_settings.limits["y2"][0] != y2_min or plot_settings.limits["y2"][1] != y2_max:
                     plot_settings.limits["y2"] = [y2_min, y2_max]
                     logger.info(f"Setting Y2 limits to {plot_settings.limits['y2']}")
                     st.experimental_rerun()
@@ -775,9 +710,7 @@ def cell_cycling_plotter_widget(
             plot_settings.format = st.selectbox(
                 "Select the format of the file",
                 available_formats,
-                index=available_formats.index(plot_settings.format)
-                if plot_settings.format
-                else 0,
+                index=available_formats.index(plot_settings.format) if plot_settings.format else 0,
                 key=f"format_export_{unique_id}",
             )
             logger.debug(f"-> Export format: {plot_settings.format}")
@@ -849,7 +782,7 @@ try:
     if enable:
 
         # Define a two tab page with a container editor and a plotter
-        container_tab, plot_tab = st.tabs(["Container editor", "Container plotter"])
+        container_tab, plot_tab, csv_tab = st.tabs(["Container editor", "Container plotter", "CSV export"])
 
         # Define the container editor tab
         with container_tab:
@@ -871,9 +804,7 @@ try:
                 col1, col2, col3 = st.columns([2, 2, 1])
 
                 with col1:
-                    container_name = st.text_input(
-                        "Insert the name of the container", value=""
-                    )
+                    container_name = st.text_input("Insert the name of the container", value="")
                     logger.debug(f"-> Container name: {container_name}")
 
                 with col2:
@@ -907,9 +838,7 @@ try:
                             f"Creating a new container named {container_name} (color {container_color}) containing experiment {experiments_names}"
                         )
 
-                        new_container = ExperimentContainer(
-                            container_name, color=container_color
-                        )
+                        new_container = ExperimentContainer(container_name, color=container_color)
 
                         if experiments_names != []:
                             for name in experiments_names:
@@ -944,9 +873,7 @@ try:
 
                         if delete:
                             logger.info(f"REMOVING container '{selected_container_name}'")
-                            idx = [obj.name for obj in available_containers].index(
-                                selected_container_name
-                            )
+                            idx = [obj.name for obj in available_containers].index(selected_container_name)
                             del available_containers[idx]
                             st.experimental_rerun()
 
@@ -959,21 +886,17 @@ try:
 
                     if selected_container_name != None:
 
-                        container_idx: int = [
-                            container.name for container in available_containers
-                        ].index(selected_container_name)
+                        container_idx: int = [container.name for container in available_containers].index(
+                            selected_container_name
+                        )
 
-                        selected_container: ExperimentContainer = available_containers[
-                            container_idx
-                        ]
+                        selected_container: ExperimentContainer = available_containers[container_idx]
 
                         with col2:
 
                             if operation_mode == "Change reference":
 
-                                logger.info(
-                                    "Render section to add change reference cycle of the container"
-                                )
+                                logger.info("Render section to add change reference cycle of the container")
 
                                 if len(selected_container) != 0:
 
@@ -987,9 +910,7 @@ try:
                                             min_value=0,
                                             max_value=len(selected_container) - 1,
                                             step=1,
-                                            disabled=True
-                                            if len(selected_container) == 0
-                                            else False,
+                                            disabled=True if len(selected_container) == 0 else False,
                                         )
                                     )
 
@@ -998,12 +919,9 @@ try:
                                             "Select cycle index",
                                             value=current_reference[1],
                                             min_value=0,
-                                            max_value=len(selected_container[exp_index]._cycles)
-                                            - 1,
+                                            max_value=len(selected_container[exp_index]._cycles) - 1,
                                             step=1,
-                                            disabled=True
-                                            if len(selected_container) == 0
-                                            else False,
+                                            disabled=True if len(selected_container) == 0 else False,
                                         )
                                     )
 
@@ -1012,16 +930,16 @@ try:
                                     if apply_ref:
                                         selected_container.reference = [exp_index, cycle_index]
                                         st.experimental_rerun()
-                                
+
                                 else:
-                                    st.info("**INFO:** Cannot change reference in an empty conatiner. Please add experiments using the `Add experiment` page.")
+                                    st.info(
+                                        "**INFO:** Cannot change reference in an empty conatiner. Please add experiments using the `Add experiment` page."
+                                    )
 
                                 # selected_container.
 
                             elif operation_mode == "Add experiment":
-                                logger.info(
-                                    "Render section to add new experiment to container"
-                                )
+                                logger.info("Render section to add new experiment to container")
                                 st.markdown("###### Add another experiment")
 
                                 valid_exp_names = [
@@ -1049,22 +967,15 @@ try:
                                     st.experimental_rerun()
 
                             else:
-                                logger.info(
-                                    "Render section to remove experiments from a container"
-                                )
+                                logger.info("Render section to remove experiments from a container")
                                 st.markdown("###### Remove a currently loaded experiment")
 
                                 get_experiment_names = st.multiselect(
                                     "Select the experiments to remove from the container",
-                                    [
-                                        name
-                                        for name in selected_container.get_experiment_names
-                                    ],
+                                    [name for name in selected_container.get_experiment_names],
                                     key="add_experiment_to_existing",
                                 )
-                                logger.debug(
-                                    f"-> Selected experiments: {get_experiment_names}"
-                                )
+                                logger.debug(f"-> Selected experiments: {get_experiment_names}")
 
                                 remove = st.button(
                                     "➖ Remove experiment",
@@ -1077,9 +988,7 @@ try:
                                     )
 
                                     for name in get_experiment_names:
-                                        exp_index = selected_container.get_index_from_name(
-                                            name
-                                        )
+                                        exp_index = selected_container.get_index_from_name(name)
 
                                         if selected_container.reference[0] == exp_index:
                                             selected_container.reference = [0, 0]
@@ -1089,9 +998,7 @@ try:
                                     st.experimental_rerun()
 
                     else:
-                        st.info(
-                            "Cannot show edit menu, no experiment container has been selected yet."
-                        )
+                        st.info("Cannot show edit menu, no experiment container has been selected yet.")
 
         # Define a plot tab to hold the plotted data
         with plot_tab:
@@ -1151,13 +1058,85 @@ try:
 
                     idx = plot_names.index(selected_plot)
 
-                    logger.info(
-                        f"RENDERING cellcycling plot {idx} (title: {selected_plot})"
-                    )
+                    logger.info(f"RENDERING cellcycling plot {idx} (title: {selected_plot})")
                     cell_cycling_plotter_widget(plot_settings_dict[selected_plot], idx)
 
                 else:
                     st.info("Please create a cell-cycling plot")
+
+            else:
+                st.info(
+                    """**No container has been created yet** \n\n Please go to the container
+                    editor tab and define at least one experiment container."""
+                )
+
+        with csv_tab:
+
+            # Visualize something only if there are available containers
+            if available_containers != []:
+
+                logger.info("Entering CSV export tab")
+
+                st.markdown("#### Cell-cycling CSV export")
+                st.write("""In this tab you can export the data associated to each container in tabular form.""")
+
+                cselect, cseries = st.columns([1, 3])
+
+                with cselect:
+                    container_name: str = st.selectbox(
+                        "Select the container to export",
+                        options=[c.name for c in available_containers],
+                        key="csv_container_selector",
+                    )
+
+                    logger.info(f"Selected container {container_name}")
+
+                    selected_container: ExperimentContainer = None
+                    for container in available_containers:
+                        if container.name == container_name:
+                            selected_container = container
+                            break
+
+                with cseries:
+                    selected_series = st.multiselect(
+                        "Select data to export", options=Y_OPTIONS, default=Y_OPTIONS, key="csv_serires_selector"
+                    )
+
+                # Define the csv data in string format
+                csv_data = ""
+                
+                # Write the header for each experiment
+                for _ in container:
+                    for label in selected_series:
+                        csv_data +=f"{label},"
+                
+                csv_data = csv_data[:-1]
+                csv_data += "\n"
+
+                # Write the data associated to each experiment
+                cycle_index = 0
+
+                while cycle_index < max([len(exp.cycles) for exp in selected_container]):
+                    for eidx, experiment in enumerate(selected_container):
+                        for label in selected_series:
+                            if len(experiment.cycles) > cycle_index:
+                                series = get_data_series(label, eidx, selected_container)
+                                csv_data += f"{series[1][cycle_index]},"
+                            else:
+                                csv_data += ","
+
+                    csv_data = csv_data[:-1]
+                    csv_data += "\n"
+                    cycle_index += 1
+
+                # Define a download button to convert the csv_data object to file
+                with cselect:
+                    st.download_button(
+                        label="📥 Download CSV",
+                        data=csv_data,
+                        file_name=f"{container_name}.csv",
+                        mime="text/csv",
+                    )
 
             else:
                 st.info(
