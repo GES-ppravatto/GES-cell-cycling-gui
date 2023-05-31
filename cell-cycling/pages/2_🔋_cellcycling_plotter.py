@@ -1078,11 +1078,14 @@ try:
                 logger.info("Entering CSV export tab")
 
                 st.markdown("#### Cell-cycling CSV export")
-                st.write("""In this tab you can export the data associated to each container in tabular form.""")
+                st.write("""In this tab you can export the data associated to each container in tabular form. The output
+                file will be in .csv format and will contain all the selected informations for the selected container.""")
 
-                cselect, cseries = st.columns([1, 3])
+                cselect, coptions, cseries = st.columns([1, 1, 3])
 
                 with cselect:
+
+                    st.markdown("##### Container selector")
                     container_name: str = st.selectbox(
                         "Select the container to export",
                         options=[c.name for c in available_containers],
@@ -1097,19 +1100,61 @@ try:
                             selected_container = container
                             break
 
+                with coptions:
+                    
+                    st.markdown("##### Data options")
+                    st.write("")
+
+                    volume_is_available = True
+                    for experiment in selected_container:
+                        if experiment.volume is None:
+                            volume_is_available = False
+                            break
+
+                    scale_csv_by_volume = st.checkbox(
+                        "Scale by volume",
+                        value=False,
+                        key="csv_scale_by_volume",
+                        disabled=not volume_is_available,
+                    )
+
+                    area_is_available = True
+                    for experiment in selected_container:
+                        if experiment.area is None:
+                            area_is_available = False
+                            break
+
+                    scale_csv_by_area = st.checkbox(
+                        "Scale by area",
+                        value=False,
+                        key="csv_scale_by_area",
+                        disabled=not area_is_available,
+                    )
+
                 with cseries:
+                    
+                    st.markdown("##### Series selector")
+
                     selected_series = st.multiselect(
                         "Select data to export", options=Y_OPTIONS, default=Y_OPTIONS, key="csv_serires_selector"
                     )
 
                 # Define the csv data in string format
                 csv_data = ""
-                
+
                 # Write the header for each experiment
                 for _ in container:
                     for label in selected_series:
-                        csv_data +=f"{label},"
-                
+                        # Extract the proper header from the helper function
+                        header, _ = get_data_series(
+                            label,
+                            0,
+                            selected_container,
+                            scale_by_volume=scale_csv_by_volume,
+                            scale_by_area=scale_csv_by_area,
+                        )
+                        csv_data += f"{header},"
+
                 csv_data = csv_data[:-1]
                 csv_data += "\n"
 
@@ -1120,7 +1165,13 @@ try:
                     for eidx, experiment in enumerate(selected_container):
                         for label in selected_series:
                             if len(experiment.cycles) > cycle_index:
-                                series = get_data_series(label, eidx, selected_container)
+                                series = get_data_series(
+                                    label,
+                                    eidx,
+                                    selected_container,
+                                    scale_by_volume=scale_csv_by_volume,
+                                    scale_by_area=scale_csv_by_area,
+                                )
                                 csv_data += f"{series[1][cycle_index]},"
                             else:
                                 csv_data += ","
