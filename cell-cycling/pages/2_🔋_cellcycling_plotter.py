@@ -1151,6 +1151,13 @@ try:
                 csv_data = ""
 
                 # Write the header for each experiment
+                for experiment in container:
+                    for _ in selected_series:
+                        csv_data += f"{experiment.name},"
+                
+                csv_data = csv_data[:-1]
+                csv_data += "\n"
+
                 for _ in container:
                     for label in selected_series:
                         # Extract the proper header from the helper function
