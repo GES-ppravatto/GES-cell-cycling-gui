@@ -1100,6 +1100,8 @@ try:
                             selected_container = container
                             break
 
+                    logger.debug(f"-> Selected container: {container.name}")
+
                 with coptions:
                     
                     st.markdown("##### Data options")
@@ -1118,6 +1120,8 @@ try:
                         disabled=not volume_is_available,
                     )
 
+                    logger.debug(f"-> Scale csv by volume: {scale_csv_by_volume}")
+
                     area_is_available = True
                     for experiment in selected_container:
                         if experiment.area is None:
@@ -1131,6 +1135,8 @@ try:
                         disabled=not area_is_available,
                     )
 
+                    logger.debug(f"-> Scale csv by area: {scale_csv_by_area}")
+
                 with cseries:
                     
                     st.markdown("##### Series selector")
@@ -1138,6 +1144,8 @@ try:
                     selected_series = st.multiselect(
                         "Select data to export", options=Y_OPTIONS, default=Y_OPTIONS, key="csv_serires_selector"
                     )
+
+                    logger.debug(f"-> Selected series to be exported in the csv: {selected_series}")
 
                 # Define the csv data in string format
                 csv_data = ""
