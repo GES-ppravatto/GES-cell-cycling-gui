@@ -1,9 +1,10 @@
-import sys, os, logging, traceback, pickle
+import sys, os, logging, traceback, pickle, openpyxl
 from typing import Dict, List, Tuple, Union
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from streamlit_plotly_events import plotly_events
+from io import BytesIO
 
 from core.gui_core import ProgramStatus, CellcyclingPlotSettings
 from core.experiment import Experiment, ExperimentContainer
@@ -782,7 +783,7 @@ try:
     if enable:
 
         # Define a two tab page with a container editor and a plotter
-        container_tab, plot_tab, csv_tab = st.tabs(["Container editor", "Container plotter", "CSV export"])
+        container_tab, plot_tab, csv_tab = st.tabs(["Container editor", "Container plotter", "Excel export"])
 
         # Define the container editor tab
         with container_tab:
@@ -1075,11 +1076,11 @@ try:
             # Visualize something only if there are available containers
             if available_containers != []:
 
-                logger.info("Entering CSV export tab")
+                logger.info("Entering XLSX export tab")
 
-                st.markdown("#### Cell-cycling CSV export")
+                st.markdown("#### Cell-cycling excel export")
                 st.write("""In this tab you can export the data associated to each container in tabular form. The output
-                file will be in .csv format and will contain all the selected informations for the selected container.""")
+                file will be in `.xlsx` format and will contain all the selected informations for the selected container.""")
 
                 cselect, coptions, cseries = st.columns([1, 1, 3])
 
@@ -1197,13 +1198,21 @@ try:
                         csv_data += "\n"
                         cycle_index += 1
 
+                    # Convert the csv file into xlsx format
+                    xls_bytestream = BytesIO()
+                    workbook = openpyxl.Workbook()
+                    sheet = workbook.active
+                    for row in csv_data.split("\n"):
+                        sheet.append(row.split(","))
+                    workbook.save(xls_bytestream)
+
                     # Define a download button to convert the csv_data object to file
                     with cselect:
                         st.download_button(
-                            label="📥 Download CSV",
-                            data=csv_data,
-                            file_name=f"{container_name}.csv",
-                            mime="text/csv",
+                            label="📥 Download xlsx",
+                            data=xls_bytestream,
+                            file_name=f"{container_name}.xlsx",
+                            mime="xlsx",
                             disabled=True if len(selected_container) == 0 else False
                         )
                 
