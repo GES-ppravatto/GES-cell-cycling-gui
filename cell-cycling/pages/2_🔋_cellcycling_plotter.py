@@ -1102,107 +1102,116 @@ try:
 
                     logger.debug(f"-> Selected container: {container.name}")
 
-                with coptions:
-                    
-                    st.markdown("##### Data options")
-                    st.write("")
+                if len(selected_container) != 0:
 
-                    volume_is_available = True
-                    for experiment in selected_container:
-                        if experiment.volume is None:
-                            volume_is_available = False
-                            break
+                    with coptions:
+                        
+                        st.markdown("##### Data options")
+                        st.write("")
 
-                    scale_csv_by_volume = st.checkbox(
-                        "Scale by volume",
-                        value=False,
-                        key="csv_scale_by_volume",
-                        disabled=not volume_is_available,
-                    )
+                        volume_is_available = True
+                        for experiment in selected_container:
+                            if experiment.volume is None:
+                                volume_is_available = False
+                                break
 
-                    logger.debug(f"-> Scale csv by volume: {scale_csv_by_volume}")
-
-                    area_is_available = True
-                    for experiment in selected_container:
-                        if experiment.area is None:
-                            area_is_available = False
-                            break
-
-                    scale_csv_by_area = st.checkbox(
-                        "Scale by area",
-                        value=False,
-                        key="csv_scale_by_area",
-                        disabled=not area_is_available,
-                    )
-
-                    logger.debug(f"-> Scale csv by area: {scale_csv_by_area}")
-
-                with cseries:
-                    
-                    st.markdown("##### Series selector")
-
-                    selected_series = st.multiselect(
-                        "Select data to export", options=Y_OPTIONS, default=Y_OPTIONS, key="csv_serires_selector"
-                    )
-
-                    logger.debug(f"-> Selected series to be exported in the csv: {selected_series}")
-
-                # Define the csv data in string format
-                csv_data = ""
-
-                # Write the header for each experiment
-                for experiment in container:
-                    for _ in selected_series:
-                        csv_data += f"{experiment.name},"
-                
-                csv_data = csv_data[:-1]
-                csv_data += "\n"
-
-                for _ in container:
-                    for label in selected_series:
-                        # Extract the proper header from the helper function
-                        header, _ = get_data_series(
-                            label,
-                            0,
-                            selected_container,
-                            scale_by_volume=scale_csv_by_volume,
-                            scale_by_area=scale_csv_by_area,
+                        scale_csv_by_volume = st.checkbox(
+                            "Scale by volume",
+                            value=False,
+                            key="csv_scale_by_volume",
+                            disabled=not volume_is_available,
                         )
-                        csv_data += f"{header},"
 
-                csv_data = csv_data[:-1]
-                csv_data += "\n"
+                        logger.debug(f"-> Scale csv by volume: {scale_csv_by_volume}")
 
-                # Write the data associated to each experiment
-                cycle_index = 0
+                        area_is_available = True
+                        for experiment in selected_container:
+                            if experiment.area is None:
+                                area_is_available = False
+                                break
 
-                while cycle_index < max([len(exp.cycles) for exp in selected_container]):
-                    for eidx, experiment in enumerate(selected_container):
+                        scale_csv_by_area = st.checkbox(
+                            "Scale by area",
+                            value=False,
+                            key="csv_scale_by_area",
+                            disabled=not area_is_available,
+                        )
+
+                        logger.debug(f"-> Scale csv by area: {scale_csv_by_area}")
+
+                    with cseries:
+                        
+                        st.markdown("##### Series selector")
+
+                        selected_series = st.multiselect(
+                            "Select data to export", options=Y_OPTIONS, default=Y_OPTIONS, key="csv_serires_selector"
+                        )
+
+                        logger.debug(f"-> Selected series to be exported in the csv: {selected_series}")
+
+                    # Define the csv data in string format
+                    csv_data = ""
+
+                    # Write the header for each experiment
+                    for experiment in container:
+                        for _ in selected_series:
+                            csv_data += f"{experiment.name},"
+                    
+                    csv_data = csv_data[:-1]
+                    csv_data += "\n"
+
+                    for _ in container:
                         for label in selected_series:
-                            if len(experiment.cycles) > cycle_index:
-                                series = get_data_series(
-                                    label,
-                                    eidx,
-                                    selected_container,
-                                    scale_by_volume=scale_csv_by_volume,
-                                    scale_by_area=scale_csv_by_area,
-                                )
-                                csv_data += f"{series[1][cycle_index]},"
-                            else:
-                                csv_data += ","
+                            # Extract the proper header from the helper function
+                            header, _ = get_data_series(
+                                label,
+                                0,
+                                selected_container,
+                                scale_by_volume=scale_csv_by_volume,
+                                scale_by_area=scale_csv_by_area,
+                            )
+                            csv_data += f"{header},"
 
                     csv_data = csv_data[:-1]
                     csv_data += "\n"
-                    cycle_index += 1
 
-                # Define a download button to convert the csv_data object to file
-                with cselect:
-                    st.download_button(
-                        label="📥 Download CSV",
-                        data=csv_data,
-                        file_name=f"{container_name}.csv",
-                        mime="text/csv",
-                    )
+                    # Write the data associated to each experiment
+                    cycle_index = 0
+
+                    while cycle_index < max([len(exp.cycles) for exp in selected_container]):
+                        for eidx, experiment in enumerate(selected_container):
+                            for label in selected_series:
+                                if len(experiment.cycles) > cycle_index:
+                                    series = get_data_series(
+                                        label,
+                                        eidx,
+                                        selected_container,
+                                        scale_by_volume=scale_csv_by_volume,
+                                        scale_by_area=scale_csv_by_area,
+                                    )
+                                    csv_data += f"{series[1][cycle_index]},"
+                                else:
+                                    csv_data += ","
+
+                        csv_data = csv_data[:-1]
+                        csv_data += "\n"
+                        cycle_index += 1
+
+                    # Define a download button to convert the csv_data object to file
+                    with cselect:
+                        st.download_button(
+                            label="📥 Download CSV",
+                            data=csv_data,
+                            file_name=f"{container_name}.csv",
+                            mime="text/csv",
+                            disabled=True if len(selected_container) == 0 else False
+                        )
+                
+                else:
+                    with cseries:
+                        st.warning("""**The selected container is empty**\n\n Please add experiments to the container before
+                        trying to export the contained data""")
+
 
             else:
                 st.info(
