@@ -1202,8 +1202,11 @@ try:
                     xls_bytestream = BytesIO()
                     workbook = openpyxl.Workbook()
                     sheet = workbook.active
-                    for row in csv_data.split("\n"):
-                        sheet.append(row.split(","))
+                    for r, row in enumerate(csv_data.split("\n")):
+                        if r<2:
+                            sheet.append(row.split(","))
+                        else:
+                            sheet.append([float(x) if x != "" else x for x in row.split(",")])
                     workbook.save(xls_bytestream)
 
                     # Define a download button to convert the csv_data object to file
