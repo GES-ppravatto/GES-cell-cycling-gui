@@ -265,6 +265,16 @@ def cell_cycling_plotter_widget(plot_settings: CellcyclingPlotSettings, unique_i
 
         logger.info("Entering plot options menu")
 
+        with st.expander("Container selector"):
+            st.markdown("###### Container selector")
+
+            plot_settings.visible_containers = st.multiselect(
+                "Select the containers to be plotted.",
+                options=[c.name for c in available_containers],
+                key=f"container_select_{unique_id}",
+                default=plot_settings.visible_containers,
+            )
+
         with st.expander("Series selector"):
             st.markdown("###### Series selector")
 
@@ -474,43 +484,48 @@ def cell_cycling_plotter_widget(plot_settings: CellcyclingPlotSettings, unique_i
                 primary_marker = MARKERS[plot_settings.primary_axis_marker]
                 secondary_marker = MARKERS[plot_settings.secondary_axis_marker]
 
-                if plot_settings.y_axis_mode != "Only secondary":
-                    fig.add_trace(
-                        go.Scatter(
-                            x=cycle_index,
-                            y=primary_axis,
-                            name=container.name,
-                            mode="markers",
-                            marker_symbol=primary_marker,
-                            marker=dict(
-                                size=plot_settings.marker_size,
-                                line=dict(width=1, color="DarkSlateGrey") if plot_settings.marker_with_border else None,
+                if container.name in plot_settings.visible_containers:
+                
+                    if plot_settings.y_axis_mode != "Only secondary":
+                        fig.add_trace(
+                            go.Scatter(
+                                x=cycle_index,
+                                y=primary_axis,
+                                name=container.name,
+                                mode="markers",
+                                marker_symbol=primary_marker,
+                                marker=dict(
+                                    size=plot_settings.marker_size,
+                                    line=dict(width=1, color="DarkSlateGrey") if plot_settings.marker_with_border else None,
+                                ),
+                                line=dict(color=container.hex_color),
+                                showlegend=True if cycling_index == 0 else False,
                             ),
-                            line=dict(color=container.hex_color),
-                            showlegend=True if cycling_index == 0 else False,
-                        ),
-                        secondary_y=False,
-                    )
+                            secondary_y=False,
+                        )
 
-                if plot_settings.y_axis_mode != "Only primary":
-                    fig.add_trace(
-                        go.Scatter(
-                            x=cycle_index,
-                            y=secondary_axis,
-                            name=container.name,
-                            mode="markers",
-                            marker_symbol=secondary_marker,
-                            marker=dict(
-                                size=plot_settings.marker_size,
-                                line=dict(width=1, color="DarkSlateGrey") if plot_settings.marker_with_border else None,
+                    if plot_settings.y_axis_mode != "Only primary":
+                        fig.add_trace(
+                            go.Scatter(
+                                x=cycle_index,
+                                y=secondary_axis,
+                                name=container.name,
+                                mode="markers",
+                                marker_symbol=secondary_marker,
+                                marker=dict(
+                                    size=plot_settings.marker_size,
+                                    line=dict(width=1, color="DarkSlateGrey") if plot_settings.marker_with_border else None,
+                                ),
+                                line=dict(color=container.hex_color),
+                                showlegend=True
+                                if plot_settings.y_axis_mode == "Only secondary" and cycling_index == 0
+                                else False,
                             ),
-                            line=dict(color=container.hex_color),
-                            showlegend=True
-                            if plot_settings.y_axis_mode == "Only secondary" and cycling_index == 0
-                            else False,
-                        ),
-                        secondary_y=True,
-                    )
+                            secondary_y=True,
+                        )
+
+                else:
+                    logger.debug(f"-> Skipping hidden container {container.name}")
 
         if plot_settings.annotations != {}:
 
@@ -545,6 +560,7 @@ def cell_cycling_plotter_widget(plot_settings: CellcyclingPlotSettings, unique_i
             gridcolor="#DDDDDD" if plot_settings.which_grid == "Primary" else None,
             title_font={"size": plot_settings.axis_font_size},
         )
+
         fig.update_yaxes(
             title_text=f"{plot_settings.secondary_axis_marker}  {secondary_label}",
             # color=secondary_axis_color,
@@ -1005,7 +1021,7 @@ try:
         with plot_tab:
 
             # Visualize something only if there are available containers
-            if available_containers != []:
+            if available_containers != [] and any([len(c) != 0 for c in available_containers]):
 
                 logger.info("Entering Container plotter tab")
 
@@ -1027,7 +1043,9 @@ try:
 
                 if add:
                     if plot_name not in plot_settings_dict:
-                        plot_settings_dict[plot_name] = CellcyclingPlotSettings()
+                        default_settings = CellcyclingPlotSettings()
+                        default_settings.visible_containers = [c.name for c in available_containers]
+                        plot_settings_dict[plot_name] = default_settings
                     else:
                         st.warning(f"WARNING: The name {plot_name} is already in use")
 
@@ -1068,7 +1086,8 @@ try:
             else:
                 st.info(
                     """**No container has been created yet** \n\n Please go to the container
-                    editor tab and define at least one experiment container."""
+                    editor tab and define at least one experiment container. If a container has been created
+                    please check that the container is not empty."""
                 )
 
         with csv_tab:
@@ -1079,8 +1098,10 @@ try:
                 logger.info("Entering XLSX export tab")
 
                 st.markdown("#### Cell-cycling excel export")
-                st.write("""In this tab you can export the data associated to each container in tabular form. The output
-                file will be in `.xlsx` format and will contain all the selected informations for the selected container.""")
+                st.write(
+                    """In this tab you can export the data associated to each container in tabular form. The output
+                file will be in `.xlsx` format and will contain all the selected informations for the selected container."""
+                )
 
                 cselect, coptions, cseries = st.columns([1, 1, 3])
 
@@ -1106,7 +1127,7 @@ try:
                 if len(selected_container) != 0:
 
                     with coptions:
-                        
+
                         st.markdown("##### Data options")
                         st.write("")
 
@@ -1141,7 +1162,7 @@ try:
                         logger.debug(f"-> Scale csv by area: {scale_csv_by_area}")
 
                     with cseries:
-                        
+
                         st.markdown("##### Series selector")
 
                         selected_series = st.multiselect(
@@ -1157,7 +1178,7 @@ try:
                     for experiment in container:
                         for _ in selected_series:
                             csv_data += f"{experiment.name},"
-                    
+
                     csv_data = csv_data[:-1]
                     csv_data += "\n"
 
@@ -1203,10 +1224,10 @@ try:
                     workbook = openpyxl.Workbook()
                     sheet = workbook.active
                     for r, row in enumerate(csv_data.split("\n")):
-                        if r<2:
+                        if r < 2:
                             sheet.append(row.split(","))
                         else:
-                            sheet.append([float(x) if x != "" else x for x in row.split(",")])
+                            sheet.append([float(x) if x != "" and x != "None" else x for x in row.split(",")])
                     workbook.save(xls_bytestream)
 
                     # Define a download button to convert the csv_data object to file
@@ -1216,14 +1237,15 @@ try:
                             data=xls_bytestream,
                             file_name=f"{container_name}.xlsx",
                             mime="xlsx",
-                            disabled=True if len(selected_container) == 0 else False
+                            disabled=True if len(selected_container) == 0 else False,
                         )
-                
+
                 else:
                     with cseries:
-                        st.warning("""**The selected container is empty**\n\n Please add experiments to the container before
-                        trying to export the contained data""")
-
+                        st.warning(
+                            """**The selected container is empty**\n\n Please add experiments to the container before
+                        trying to export the contained data"""
+                        )
 
             else:
                 st.info(

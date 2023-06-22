@@ -445,3 +445,4 @@ class CellcyclingPlotSettings:
         }
     )
     annotations: dict = field(default_factory=lambda: {})
+    visible_containers: List[str] = None
